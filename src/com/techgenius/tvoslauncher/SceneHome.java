@@ -1307,6 +1307,11 @@ final class SceneHome {
 
         tile.setOnLongClickListener(v -> {
             if (!isGear && !isMore && moveDockIdx < 0) {
+                if (MainActivity.isDockLocked(host)) {
+                    host.toast(I18n.s(host, "Dock is locked. Unlock in Settings to make changes.",
+                            "Dock kilitli. Değiştirmek için Ayarlar'dan kilidi açın."));
+                    return true;
+                }
                 showDockAppMenu(index, a, v);
                 return true;
             }
@@ -1359,6 +1364,11 @@ final class SceneHome {
     }
 
     private void showDockAppMenu(int index, MainActivity.AppEntry a, View tile) {
+        if (MainActivity.isDockLocked(host)) {
+            host.toast(I18n.s(host, "Dock is locked. Unlock in Settings to make changes.",
+                    "Dock kilitli. Değiştirmek için Ayarlar'dan kilidi açın."));
+            return;
+        }
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         labels.add(I18n.s(host, "Open", "Aç"));
@@ -2154,6 +2164,11 @@ final class SceneHome {
             if (dIdx >= 0 && dIdx < dockEntries.size()) {
                 MainActivity.AppEntry a = dockEntries.get(dIdx);
                 if (!GEAR_KEY.equals(a.key) && !MORE_KEY.equals(a.key)) {
+                    if (MainActivity.isDockLocked(host)) {
+                        host.toast(I18n.s(host, "Dock is locked. Unlock in Settings to make changes.",
+                                "Dock kilitli. Değiştirmek için Ayarlar'dan kilidi açın."));
+                        return true;
+                    }
                     showDockAppMenu(dIdx, a, f);
                     return true;
                 }

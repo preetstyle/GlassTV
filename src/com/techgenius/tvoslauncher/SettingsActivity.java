@@ -1095,6 +1095,16 @@ public class SettingsActivity extends Activity {
             pageHiddenApps();
             return;
         }
+        row(tr("Lock dock apps", "Dock uygulamalarını kilitle"),
+                () -> MainActivity.isDockLocked(this) ? tr("On", "Açık") : tr("Off", "Kapalı"),
+                () -> {
+                    boolean locked = !MainActivity.isDockLocked(this);
+                    MainActivity.setDockLocked(this, locked);
+                    showStatusMsg(locked
+                            ? tr("Dock is locked — apps cannot be moved, hidden or uninstalled.",
+                                    "Dock kilitlendi — uygulamalar taşınamaz, gizlenemez veya kaldırılamaz.")
+                            : tr("Dock unlocked.", "Dock kilidi açıldı."));
+                });
         row(tr("Hidden apps", "Gizlenen uygulamalar"),
                 () -> {
                     int count = listHiddenAppItems().size();

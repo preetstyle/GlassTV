@@ -83,7 +83,16 @@ public class MainActivity extends Activity {
     static final String PREF_ORDER = "order";
     static final String PREF_HIDDEN = "hidden";
     static final String PREF_OTHER = "other_apps";
+    public static final String PREF_LOCK_DOCK = "lock_dock";
     static final String TV_SETTINGS = "com.android.tv.settings";
+
+    public static boolean isDockLocked(android.content.Context c) {
+        return Profiles.homePrefs(c).getBoolean(PREF_LOCK_DOCK, true);
+    }
+
+    public static void setDockLocked(android.content.Context c, boolean locked) {
+        Profiles.homePrefs(c).edit().putBoolean(PREF_LOCK_DOCK, locked).apply();
+    }
 
     /** Packages placed first (in this order) until the user rearranges the grid. */
     static final List<String> DEFAULT_ORDER = Arrays.asList(
@@ -1220,7 +1229,14 @@ public class MainActivity extends Activity {
             }
         });
         tile.setOnLongClickListener(v -> {
-            if (moveIndex < 0 && !FOLDER_KEY.equals(a.key)) showOptions(index);
+            if (moveIndex < 0 && !FOLDER_KEY.equals(a.key)) {
+                if (isDockLocked(this)) {
+                    Toast.makeText(this, I18n.s(this, "Dock is locked. Unlock in Settings to make changes.",
+                            "Dock kilitli. Değiştirmek için Ayarlar'dan kilidi açın."), Toast.LENGTH_SHORT).show();
+                } else {
+                    showOptions(index);
+                }
+            }
             return true;
         });
         tiles.add(tile);
@@ -3433,7 +3449,14 @@ public class MainActivity extends Activity {
         if (k == KeyEvent.KEYCODE_MENU) {
             if (!down) {
                 int i = tiles.indexOf(getCurrentFocus());
-                if (i >= 0 && !FOLDER_KEY.equals(shown.get(i).key)) showOptions(i);
+                if (i >= 0 && !FOLDER_KEY.equals(shown.get(i).key)) {
+                    if (isDockLocked(this)) {
+                        Toast.makeText(this, I18n.s(this, "Dock is locked. Unlock in Settings to make changes.",
+                                "Dock kilitli. Değiştirmek için Ayarlar'dan kilidi açın."), Toast.LENGTH_SHORT).show();
+                    } else {
+                        showOptions(i);
+                    }
+                }
             }
             return true;
         }
@@ -3478,8 +3501,19 @@ public class MainActivity extends Activity {
             }
         }
 
-        Set<String> hidden = prefs.getStringSet(PREF_HIDDEN, Collections.emptySet());
-        Set<String> other = prefs.getStringSet(PREF_OTHER, Collections.emptySet());
+        Set<String> hidden = new HashSet<>(prefs.getStringSet(PREF_HIDDEN, Collections.emptySet()));
+        Set<String> other = new HashSet<>(prefs.getStringSet(PREF_OTHER, Collections.emptySet()));
+        boolean cleanedPrefs = false;
+        if (hidden.remove("com.android.vending") || hidden.remove("com.android.vending/com.google.android.finsky.tvmainactivity.TvMainActivity")) {
+            cleanedPrefs = true;
+        }
+        if (other.remove("com.android.vending") || other.remove("com.android.vending/com.google.android.finsky.tvmainactivity.TvMainActivity")) {
+            cleanedPrefs = true;
+        }
+        if (cleanedPrefs) {
+            prefs.edit().putStringSet(PREF_HIDDEN, hidden).putStringSet(PREF_OTHER, other).apply();
+        }
+
         Map<String, AppEntry> pool = new LinkedHashMap<>();
         for (AppEntry e : all.values()) {
             if (hidden.contains(e.key) || (e.pkg != null && hidden.contains(e.pkg))) {
@@ -3503,6 +3537,25 @@ public class MainActivity extends Activity {
             return px != py ? Integer.compare(px, py) : x.label.compareToIgnoreCase(y.label);
         });
         apps.addAll(rest);
+
+        // Ensure canonical default order if Play Store was previously missing from PREF_ORDER
+        String curOrder = prefs.getString(PREF_ORDER, "");
+        if (!curOrder.contains("com.android.vending")) {
+            boolean hasPlayStore = false;
+            for (AppEntry ae : apps) {
+                if ("com.android.vending".equals(ae.pkg)) {
+                    hasPlayStore = true;
+                    break;
+                }
+            }
+            if (hasPlayStore) {
+                Collections.sort(apps, (x, y) -> {
+                    int px = priority(x), py = priority(y);
+                    return px != py ? Integer.compare(px, py) : x.label.compareToIgnoreCase(y.label);
+                });
+                saveOrder();
+            }
+        }
         // Inputs starts as the first card in the dock until it is moved.
         if (!Arrays.asList(prefs.getString(PREF_ORDER, "").split(",")).contains(INPUTS_KEY)) {
             for (int i = 0; i < apps.size(); i++) {
@@ -3878,6 +3931,11 @@ public class MainActivity extends Activity {
     }
 
     void showOptions(int index) {
+        if (isDockLocked(this)) {
+            Toast.makeText(this, I18n.s(this, "Dock is locked. Unlock in Settings to make changes.",
+                    "Dock kilitli. Değiştirmek için Ayarlar'dan kilidi açın."), Toast.LENGTH_SHORT).show();
+            return;
+        }
         AppEntry a = shown.get(index);
         View tile = tiles.get(index);
         List<String> labels = new ArrayList<>();

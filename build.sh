@@ -5,12 +5,17 @@ cd "$(dirname "$0")"
 
 # JDK 17+ and the Android SDK (build-tools 34.0.0, platform android-34). Override with the usual
 # variables: JAVA_HOME, ANDROID_HOME (or ANDROID_SDK_ROOT).
-if [ -z "${JAVA_HOME:-}" ] && [ -d "$HOME/.local/jdk-17.0.20.1+1/Contents/Home" ]; then
-    JAVA_HOME="$HOME/.local/jdk-17.0.20.1+1/Contents/Home"
+if [ -z "${JAVA_HOME:-}" ]; then
+    if [ -d "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home" ]; then
+        JAVA_HOME="/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
+    elif [ -d "$HOME/.local/jdk-17.0.20.1+1/Contents/Home" ]; then
+        JAVA_HOME="$HOME/.local/jdk-17.0.20.1+1/Contents/Home"
+    fi
 fi
 if [ -n "${JAVA_HOME:-}" ]; then export JAVA_HOME; export PATH="$JAVA_HOME/bin:$PATH"; fi
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
-[ -d "$SDK" ] || SDK="$HOME/Android/Sdk"  # Linux default
+[ -d "$SDK/build-tools" ] || SDK="/opt/homebrew/share/android-commandlinetools"
+[ -d "$SDK/build-tools" ] || SDK="$HOME/Android/Sdk"  # Linux default
 BT="$SDK/build-tools/34.0.0"
 JAR="$SDK/platforms/android-34/android.jar"
 for f in "$BT/aapt2" "$BT/d8" "$JAR"; do

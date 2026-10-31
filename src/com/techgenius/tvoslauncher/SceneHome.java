@@ -1506,6 +1506,10 @@ final class SceneHome {
         if (a.pkg != null) logoCache.remove(a.pkg);
     }
 
+    void clearLogoCache() {
+        logoCache.clear();
+    }
+
     Bitmap getSquareAppIcon(MainActivity.AppEntry a) {
         if (a == null) return null;
         if (isYouTubePkg(a.pkg, a.key)) {
@@ -1804,6 +1808,23 @@ final class SceneHome {
                 });
         card.addView(btnHomeSettings);
 
+        View btnPushIcons = makeGearOptionRow(
+                "apps",
+                I18n.s(host, "Push icons", "İkonları güncelle"),
+                I18n.s(host, "Re-apply custom icons for YouTube, SFTV & Settings",
+                        "YouTube, SFTV ve Ayarlar için özel ikonları yeniden uygula"),
+                () -> {
+                    closeSheet();
+                    CustomMedia.pushOfficialAppIcons(host);
+                    android.widget.Toast.makeText(host,
+                            I18n.s(host, "Icons pushed & updated!", "İkonlar güncellendi!"),
+                            android.widget.Toast.LENGTH_SHORT).show();
+                });
+        LinearLayout.LayoutParams pilp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pilp.topMargin = dp(2);
+        card.addView(btnPushIcons, pilp);
+
         View btnTvSettings = makeGearOptionRow(
                 "gear",
                 I18n.s(host, "TV settings", "TV ayarları"),
@@ -1819,10 +1840,14 @@ final class SceneHome {
         card.addView(btnTvSettings, tvlp);
 
         btnHomeSettings.setId(View.generateViewId());
+        btnPushIcons.setId(View.generateViewId());
         btnTvSettings.setId(View.generateViewId());
-        btnHomeSettings.setNextFocusDownId(btnTvSettings.getId());
+
+        btnHomeSettings.setNextFocusDownId(btnPushIcons.getId());
         btnHomeSettings.setNextFocusUpId(btnTvSettings.getId());
-        btnTvSettings.setNextFocusUpId(btnHomeSettings.getId());
+        btnPushIcons.setNextFocusUpId(btnHomeSettings.getId());
+        btnPushIcons.setNextFocusDownId(btnTvSettings.getId());
+        btnTvSettings.setNextFocusUpId(btnPushIcons.getId());
         btnTvSettings.setNextFocusDownId(btnHomeSettings.getId());
 
         int popW = dp(330);

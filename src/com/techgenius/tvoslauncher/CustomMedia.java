@@ -1331,4 +1331,71 @@ public final class CustomMedia {
                 .setNegativeButton(I18n.s(activity, "Cancel", "İptal"), null)
                 .show();
     }
+
+    public static void clearAllCustomIconsCache() {
+        synchronized (ICON_CACHE) {
+            ICON_CACHE.clear();
+        }
+    }
+
+    public static void pushOfficialAppIcons(Context c) {
+        if (c == null) return;
+        try {
+            // 1. YouTube official brand card
+            Bitmap yt = Scenes.loadAssetBitmap(c, "app-logos/youtube_full_logo.png", 512, 512);
+            if (yt != null) {
+                String[] ytPkgs = {
+                    "com.google.android.youtube.tv",
+                    "com.google.android.youtube.tvkids",
+                    "org.smarttube.stable",
+                    "com.liskovsoft.smarttubetv.beta",
+                    "io.gh.reisxd.tizentube.cobalt"
+                };
+                for (String pkg : ytPkgs) {
+                    setCustomAppIcon(c, pkg, pkg, yt);
+                }
+            }
+
+            // 2. Send Files To TV card
+            Bitmap sftv = Scenes.loadAssetBitmap(c, "app-logos/sendfiles_logo.png", 512, 512);
+            if (sftv != null) {
+                String[] sftvPkgs = {
+                    "com.yablio.sendfilestotv",
+                    "com.google.android.apps.sftv"
+                };
+                for (String pkg : sftvPkgs) {
+                    setCustomAppIcon(c, pkg, pkg, sftv);
+                }
+            }
+
+            // 3. Settings card
+            Bitmap gear = Scenes.loadAssetBitmap(c, "app-logos/settings_gear.png", 512, 512);
+            if (gear != null) {
+                String[] gearKeys = {
+                    SceneHome.GEAR_KEY,
+                    MainActivity.SETTINGS_KEY,
+                    MainActivity.TV_SETTINGS,
+                    "com.android.settings"
+                };
+                for (String k : gearKeys) {
+                    setCustomAppIcon(c, k, k, gear);
+                }
+            }
+
+            clearAllCustomIconsCache();
+
+            if (MainActivity.activeInstance != null) {
+                MainActivity.activeInstance.runOnUiThread(() -> {
+                    if (MainActivity.activeInstance.sceneHome != null) {
+                        MainActivity.activeInstance.sceneHome.clearLogoCache();
+                        MainActivity.activeInstance.sceneHome.rebuildDock();
+                    }
+                    MainActivity.activeInstance.loadApps();
+                    MainActivity.activeInstance.buildGrid();
+                });
+            }
+        } catch (Throwable t) {
+            // ignore
+        }
+    }
 }

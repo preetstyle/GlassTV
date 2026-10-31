@@ -849,6 +849,14 @@ public class SettingsActivity extends Activity {
                     refreshAll();
                 });
 
+        row(tr("Push icons", "İkonları güncelle"),
+                () -> "",
+                () -> {
+                    CustomMedia.pushOfficialAppIcons(this);
+                    showStatusMsg(tr("All app icons pushed & updated.", "Tüm uygulama ikonları güncellendi ve uygulandı."));
+                    Toast.makeText(this, tr("Icons pushed & updated!", "İkonlar güncellendi!"), Toast.LENGTH_SHORT).show();
+                });
+
         section(tr("REDDIT WALLPAPERS (r/TVWallpapersSFW)", "REDDIT DUVAR KAĞITLARI"));
         row(tr("Fetch Reddit wallpaper", "Reddit duvar kağıdı getir"),
                 () -> "›",
@@ -1096,6 +1104,13 @@ public class SettingsActivity extends Activity {
                     showingHiddenApps = true;
                     rebuildMainRows();
                     focusFirstRow();
+                });
+        row(tr("Push icons", "İkonları güncelle"),
+                () -> "",
+                () -> {
+                    CustomMedia.pushOfficialAppIcons(this);
+                    showStatusMsg(tr("All app icons pushed & updated.", "Tüm uygulama ikonları güncellendi ve uygulandı."));
+                    Toast.makeText(this, tr("Icons pushed & updated!", "İkonlar güncellendi!"), Toast.LENGTH_SHORT).show();
                 });
         row(tr("Reset app order & unhide all", "Uygulama sırasını sıfırla ve gizlenenleri göster"),
                 () -> "",

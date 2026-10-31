@@ -89,6 +89,7 @@ public final class RecentAppsOverlay {
         LOGO_ASSETS.put("com.google.android.youtube.tvkids", "com.google.android.youtube.tv.png");
         LOGO_ASSETS.put("org.smarttube.stable", "com.google.android.youtube.tv.png");
         LOGO_ASSETS.put("com.liskovsoft.smarttubetv.beta", "com.google.android.youtube.tv.png");
+        LOGO_ASSETS.put("io.gh.reisxd.tizentube.cobalt", "com.google.android.youtube.tv.png");
         LOGO_ASSETS.put("com.teamsmart.videomanager.tv", "com.google.android.youtube.tv.png");
         LOGO_ASSETS.put("com.amazon.amazonvideo.livingroom", "com.amazon.amazonvideo.livingroom.png");
         LOGO_ASSETS.put("com.amazon.avod.thirdpartyclient", "com.amazon.amazonvideo.livingroom.png");

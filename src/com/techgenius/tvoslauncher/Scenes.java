@@ -222,6 +222,19 @@ public final class Scenes {
         }
     }
 
+    public static void cycleDockScale(Context c) {
+        int[] steps = {70, 85, 100, 115, 130};
+        int cur = getDockScalePercent(c);
+        int next = steps[0];
+        for (int i = 0; i < steps.length; i++) {
+            if (steps[i] == cur) {
+                next = steps[(i + 1) % steps.length];
+                break;
+            }
+        }
+        setDockScalePercent(c, next);
+    }
+
     public static List<String> getSceneOrder(Context c) {
         String raw = prefs(c).getString("scene_order", "night,golden,water,fog,dawn,custom,custom_2,custom_3,custom_4,custom_5");
         List<String> out = new ArrayList<>();
@@ -659,9 +672,7 @@ public final class Scenes {
 
         private void scheduleNextRotation() {
             handler.removeCallbacks(rotateTick);
-            if (activeIds.size() > 1) {
-                handler.postDelayed(rotateTick, getStaySeconds(getContext()) * 1000L);
-            }
+            // Auto rotation disabled: applied wallpaper stays permanently
         }
 
         private void advanceScene() {

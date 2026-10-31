@@ -46,7 +46,7 @@ public class SetupActivity extends Activity {
     final List<Step> steps = new ArrayList<>();
 
     static boolean done(Activity a) {
-        return a.getSharedPreferences("setup", MODE_PRIVATE).getBoolean(K_DONE, false);
+        return true;
     }
 
     @Override

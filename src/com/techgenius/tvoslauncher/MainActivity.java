@@ -26,6 +26,7 @@ import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Outline;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.RadialGradient;
 import android.graphics.Rect;
@@ -86,15 +87,15 @@ public class MainActivity extends Activity {
 
     /** Packages placed first (in this order) until the user rearranges the grid. */
     static final List<String> DEFAULT_ORDER = Arrays.asList(
+            "io.gh.reisxd.tizentube.cobalt",
+            "com.google.android.youtube.tv",
+            "org.smarttube.stable",
+            "com.nuvio.tv",
+            "com.android.vending",
+            "com.yablio.sendfilestotv",
+            "com.stremio.one",
             "com.netflix.ninja",
             "com.amazon.amazonvideo.livingroom",
-            "org.smarttube.stable",
-            "in.startv.hotstar",
-            "com.apple.atve.androidtv.appletv",
-            "com.spotify.tv.android",
-            "com.mitv.tvhome.mitvplus",
-            "com.google.android.youtube.tv",
-            "org.videolan.vlc",
             "io.github.jqssun.airplay");
 
     static final PathInterpolator EASE = new PathInterpolator(0.2f, 0f, 0f, 1f);
@@ -200,6 +201,10 @@ public class MainActivity extends Activity {
     final LiquidGlass.Backdrop glassSource = () -> glassBg;
     View dockRow;
     boolean returningFromSettings;
+    float lastDockScale = -1f;
+    String lastDockLook;
+    String lastIconShape;
+    long lastCustomWallTs = -1L;
     final java.util.concurrent.ExecutorService io = java.util.concurrent.Executors.newSingleThreadExecutor();
     final Runnable heroAdvance = () -> {
         if (this.search != null) scheduleAdvance();  // nothing to see under search; keep the slot
@@ -217,6 +222,117 @@ public class MainActivity extends Activity {
     int moveIndex = -1;
     boolean folderMode;
     boolean resumed;
+
+    public static final String SHAPE_CIRCLE = "circle";
+    public static final String SHAPE_SQUIRCLE = "squircle";
+    public static final String SHAPE_ROUNDED_SQUARE = "rounded_square";
+    public static final String SHAPE_TEARDROP = "teardrop";
+    public static final String SHAPE_CYLINDER = "cylinder";
+
+    public static final String[] PIXEL_SHAPES = {
+        SHAPE_CIRCLE,
+        SHAPE_SQUIRCLE,
+        SHAPE_ROUNDED_SQUARE,
+        SHAPE_TEARDROP,
+        SHAPE_CYLINDER
+    };
+
+    public static String getIconShape(Context c) {
+        return c.getSharedPreferences("home_prefs", Context.MODE_PRIVATE)
+                .getString("icon_shape", SHAPE_CIRCLE);
+    }
+
+    public static void setIconShape(Context c, String shape) {
+        c.getSharedPreferences("home_prefs", Context.MODE_PRIVATE)
+                .edit().putString("icon_shape", shape).apply();
+    }
+
+    public static String getIconShapeLabel(Context c) {
+        String s = getIconShape(c);
+        switch (s) {
+            case SHAPE_CIRCLE: return I18n.s(c, "Circle (Pixel)", "Daire (Pixel)");
+            case SHAPE_SQUIRCLE: return I18n.s(c, "Squircle", "Squircle");
+            case SHAPE_ROUNDED_SQUARE: return I18n.s(c, "Rounded square", "Yuvarlak kare");
+            case SHAPE_TEARDROP: return I18n.s(c, "Teardrop", "Damlacık");
+            case SHAPE_CYLINDER: return I18n.s(c, "Cylinder", "Silindir");
+            default: return I18n.s(c, "Circle", "Daire");
+        }
+    }
+
+    public static void cycleIconShape(Context c) {
+        String cur = getIconShape(c);
+        int idx = 0;
+        for (int i = 0; i < PIXEL_SHAPES.length; i++) {
+            if (PIXEL_SHAPES[i].equals(cur)) {
+                idx = (i + 1) % PIXEL_SHAPES.length;
+                break;
+            }
+        }
+        setIconShape(c, PIXEL_SHAPES[idx]);
+    }
+
+    static void applyShapeToTile(View tile, GradientDrawable bg, String shape, int w, int h) {
+        tile.setClipToOutline(true);
+        float minDim = Math.min(w, h);
+        switch (shape) {
+            case SHAPE_CIRCLE:
+                float circRad = minDim / 2f;
+                bg.setCornerRadius(circRad);
+                tile.setOutlineProvider(new ViewOutlineProvider() {
+                    @Override public void getOutline(View v, Outline o) {
+                        float r = Math.min(v.getWidth(), v.getHeight()) / 2f;
+                        o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), r);
+                    }
+                });
+                break;
+            case SHAPE_SQUIRCLE:
+                float sqRad = minDim * 0.30f;
+                bg.setCornerRadius(sqRad);
+                tile.setOutlineProvider(new ViewOutlineProvider() {
+                    @Override public void getOutline(View v, Outline o) {
+                        o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), sqRad);
+                    }
+                });
+                break;
+            case SHAPE_ROUNDED_SQUARE:
+                float rsqRad = minDim * 0.16f;
+                bg.setCornerRadius(rsqRad);
+                tile.setOutlineProvider(new ViewOutlineProvider() {
+                    @Override public void getOutline(View v, Outline o) {
+                        o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), rsqRad);
+                    }
+                });
+                break;
+            case SHAPE_TEARDROP:
+                float tdRad = minDim / 2f;
+                bg.setCornerRadii(new float[]{tdRad, tdRad, tdRad, tdRad, 6f, 6f, tdRad, tdRad});
+                tile.setOutlineProvider(new ViewOutlineProvider() {
+                    @Override public void getOutline(View v, Outline o) {
+                        o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), minDim * 0.30f);
+                    }
+                });
+                break;
+            case SHAPE_CYLINDER:
+                float cylRad = minDim * 0.45f;
+                bg.setCornerRadius(cylRad);
+                tile.setOutlineProvider(new ViewOutlineProvider() {
+                    @Override public void getOutline(View v, Outline o) {
+                        o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), cylRad);
+                    }
+                });
+                break;
+            default:
+                float defRad = minDim * 0.22f;
+                bg.setCornerRadius(defRad);
+                tile.setOutlineProvider(new ViewOutlineProvider() {
+                    @Override public void getOutline(View v, Outline o) {
+                        o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), defRad);
+                    }
+                });
+                break;
+        }
+        tile.setClipToOutline(true);
+    }
     ObjectAnimator wiggle;
     AppEntry shelfEntry;
     BroadcastReceiver pkgReceiver;
@@ -423,14 +539,36 @@ public class MainActivity extends Activity {
         activeInstance = this;
         clearLaunchDim();
         boolean wasReturningFromSettings = returningFromSettings;
+
+        float curDockScale = Scenes.getDockScaleFactor(this);
+        String curDockLook = SceneHome.getDockLook(this);
+        String curIconShape = getIconShape(this);
+        long curCustomWallTs = CustomMedia.getCustomClassicWallpaperTs(this);
+
+        boolean dockOrShapeChanged = (lastDockScale >= 0f && Math.abs(lastDockScale - curDockScale) > 0.001f)
+                || (lastDockLook != null && !lastDockLook.equals(curDockLook))
+                || (lastIconShape != null && !lastIconShape.equals(curIconShape));
+
+        String ws = Profiles.homePrefs(this).getString("wallpaper", "photo:tessellated-pavement.jpg");
+        boolean wallChanged = wasReturningFromSettings
+                || !ws.equals(wallStyle)
+                || ("custom".equals(ws) && lastCustomWallTs >= 0L && lastCustomWallTs != curCustomWallTs)
+                || wallView.getDrawable() == null;
+
         if (!Scenes.isScenesLook(this)) {
-            String ws = Profiles.homePrefs(this).getString("wallpaper", "photo:tessellated-pavement.jpg");
-            if (!ws.equals(wallStyle) || wallView.getDrawable() == null || (wasReturningFromSettings && "custom".equals(ws))) {
+            if (wallChanged) {
                 wallStyle = ws;
                 setWallpaper(ws);
             }
         }
-        if (returningFromSettings && !folderMode && launchOverlay == null && moveIndex < 0) reload(currentKey());
+        lastCustomWallTs = curCustomWallTs;
+
+        if ((returningFromSettings || dockOrShapeChanged) && !folderMode && launchOverlay == null && moveIndex < 0) {
+            reload(currentKey());
+        }
+        lastDockScale = curDockScale;
+        lastDockLook = curDockLook;
+        lastIconShape = curIconShape;
         returningFromSettings = false;
         updateStatusClockFormat();
         if (avatarView != null) {
@@ -443,7 +581,7 @@ public class MainActivity extends Activity {
             sceneHome.refreshWhoBar();
             sceneHome.refreshMoonBtn();
             sceneHome.refreshKeepWatching();
-            if (wasReturningFromSettings || sceneHome.dockTiles.isEmpty()) {
+            if (wasReturningFromSettings || dockOrShapeChanged || sceneHome.dockTiles.isEmpty()) {
                 sceneHome.rebuildDock();
             }
             if (pickerLayer == null && menuLayer == null && !sceneHome.isSheetOpen()) {
@@ -484,7 +622,6 @@ public class MainActivity extends Activity {
         handler.post(weatherTick);
         LocalAdb.ensureKeepAliveWatchdog(this);
         LocalAdb.scheduleKeepAliveRepair(this, 1000L);
-        AppUpdater.checkAutoUpdateIfNeeded(this);
         if (ambientShowcase || (getIntent() != null && "ambient".equals(getIntent().getStringExtra("panel")))) {
             if (getIntent() != null) getIntent().removeExtra("panel");
             enterAmbientShowcase();
@@ -643,10 +780,8 @@ public class MainActivity extends Activity {
         ImageView chevronView = new ImageView(this);
         chevronView.setImageBitmap(cb);
         chevron = chevronView;
-        FrameLayout.LayoutParams chp = new FrameLayout.LayoutParams(cw, ch,
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        chp.bottomMargin = dp(14);
-        shelf.addView(chevron, chp);
+        chevron.setVisibility(View.GONE);
+        // Requirement 3: Upper arrow removed from dock
         content.addView(shelf, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, shelfH));
 
         // tvOS 26 status row (per Apple's Control Center reference): plain time, then a glass
@@ -680,9 +815,9 @@ public class MainActivity extends Activity {
         time.setShadowLayer(dp(8), 0, dp(1), 0x99000000);
         timeChip.addView(netIcon, nlp);
         timeChip.addView(time);
-        clockBox.addView(timeChip, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, btn));
+        // Requirement 3: time, refresh, search, avatar removed from status row; only ccButton remains
 
-        // Refresh: reloads every part of the carousel (recommendations, news, Continue Watching) and weather.
+        // Refresh button (removed from top bar per requirement 3)
         refreshButton = new ImageView(this);
         refreshButton.setScaleType(ImageView.ScaleType.CENTER);
         refreshButton.setImageBitmap(Glyphs.get("refresh", dp(20), Color.WHITE));
@@ -691,20 +826,9 @@ public class MainActivity extends Activity {
         refreshButton.setBackground(rfGlass);
         refreshButton.setFocusable(true);
         refreshButton.setClickable(true);
-        LinearLayout.LayoutParams rblp = new LinearLayout.LayoutParams(btn, btn);
-        rblp.leftMargin = dp(18);
-        clockBox.addView(refreshButton, rblp);
-        GradientDrawable rfLit = new GradientDrawable();
-        rfLit.setShape(GradientDrawable.OVAL);
-        rfLit.setColor(Color.WHITE);
-        refreshButton.setOnFocusChangeListener((v, has) -> {
-            refreshButton.setBackground(has ? rfLit : rfGlass);
-            refreshButton.setImageBitmap(Glyphs.get("refresh", dp(20), has ? 0xFF111114 : Color.WHITE));
-            v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(200).setInterpolator(LIFT).start();
-        });
         refreshButton.setOnClickListener(v -> refreshAll());
 
-        // Search, beside Control Center: apps, settings, and movies and shows on every service.
+        // Search button (removed from top bar per requirement 3)
         searchButton = new ImageView(this);
         searchButton.setScaleType(ImageView.ScaleType.CENTER);
         searchButton.setImageBitmap(Glyphs.get("search", dp(20), Color.WHITE));
@@ -713,17 +837,6 @@ public class MainActivity extends Activity {
         searchButton.setBackground(seGlass);
         searchButton.setFocusable(true);
         searchButton.setClickable(true);
-        LinearLayout.LayoutParams sblp = new LinearLayout.LayoutParams(btn, btn);
-        sblp.leftMargin = dp(12);
-        clockBox.addView(searchButton, sblp);
-        GradientDrawable seLit = new GradientDrawable();
-        seLit.setShape(GradientDrawable.OVAL);
-        seLit.setColor(Color.WHITE);
-        searchButton.setOnFocusChangeListener((v, has) -> {
-            searchButton.setBackground(has ? seLit : seGlass);
-            searchButton.setImageBitmap(Glyphs.get("search", dp(20), has ? 0xFF111114 : Color.WHITE));
-            v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(200).setInterpolator(LIFT).start();
-        });
         searchButton.setOnClickListener(v -> showSearch(null));
 
         ccButton = new ImageView(this);
@@ -735,7 +848,6 @@ public class MainActivity extends Activity {
         ccButton.setFocusable(true);
         ccButton.setClickable(true);
         LinearLayout.LayoutParams cblp = new LinearLayout.LayoutParams(btn, btn);
-        cblp.leftMargin = dp(12);
         clockBox.addView(ccButton, cblp);
         GradientDrawable ccLit = new GradientDrawable();
         ccLit.setShape(GradientDrawable.OVAL);
@@ -746,35 +858,6 @@ public class MainActivity extends Activity {
             v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(200).setInterpolator(LIFT).start();
         });
         ccButton.setOnClickListener(v -> showControlCenter());
-
-
-        int av = btn;
-        ImageView avatar = new ImageView(this);
-        avatar.setImageBitmap(Profiles.avatar(this, Profiles.current(this), av));
-        avatar.setFocusable(true);
-        avatar.setClickable(true);
-        avatar.setOutlineProvider(new ViewOutlineProvider() {
-            @Override public void getOutline(View v, Outline o) {
-                o.setOval(0, 0, v.getWidth(), v.getHeight());
-            }
-        });
-        avatar.setClipToOutline(true);
-        avatarView = avatar;
-        avatarSize = av;
-        avatar.setVisibility(Profiles.list(this).size() > 1 ? View.VISIBLE : View.GONE);
-        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(av, av);
-        alp.leftMargin = dp(12);
-        clockBox.addView(avatar, alp);
-        GradientDrawable avRing = new GradientDrawable();
-        avRing.setShape(GradientDrawable.OVAL);
-        avRing.setColor(Color.TRANSPARENT);
-        avRing.setStroke(dp(2), Color.WHITE);
-        avatar.setOnFocusChangeListener((v, has) -> {
-            avatar.setForeground(has ? avRing : null);
-            v.animate().withLayer().scaleX(has ? 1.14f : 1f).scaleY(has ? 1.14f : 1f)
-                    .setDuration(180).setInterpolator(LIFT).start();
-        });
-        avatar.setOnClickListener(v -> showProfilePicker(false));
 
         // Room around the buttons for their focus growth (1.12x / 1.18x) so nothing is clipped;
         // the margins shrink by the same amount, so the row sits exactly where it did.
@@ -803,15 +886,9 @@ public class MainActivity extends Activity {
         });
         weatherCard.setPivotX(0);
         weatherCard.setPivotY(0);
-        weatherCard.setOnClickListener(v -> showWeather());
-        // Top left, level with the status row and inside the same 48 px edge margin.
-        FrameLayout.LayoutParams wlp = new FrameLayout.LayoutParams(dp(WeatherView.COMPACT_W), dp(WeatherView.COMPACT_H),
-                Gravity.TOP | Gravity.START);
-        wlp.topMargin = dp(24);
-        wlp.leftMargin = dockOuter;
-        root.addView(weatherCard, wlp);
+        weatherCard.setVisibility(View.GONE);
+        // Requirement 3 & 7: Weather completely removed
         root.addView(sceneHome.overlay, match());
-        updateWeather();
 
         setContentView(root);
     }
@@ -870,12 +947,14 @@ public class MainActivity extends Activity {
         shown.clear();
         effectiveOtherApps.clear();
 
-        // Classic appearance uses fixed 100% scale (dock resizing is only for Night Scenes dock).
-        // When a tile in the dock is focused, it scales by FOCUS_SCALE (1.20x), expanding outward
-        // by (FOCUS_SCALE - 1)/2 on each side. Account for that growth so the focused first and
-        // last dock cards have symmetrical left/right and top/bottom margins inside the dock rim.
-        int focusGrowX = Math.round(tileW * (FOCUS_SCALE - 1f) / 2f);
-        int focusGrowY = Math.round(tileH * (FOCUS_SCALE - 1f) / 2f);
+        float dockScale = Scenes.getDockScaleFactor(this);
+        boolean isMac = SceneHome.DOCK_LOOK_MACOS.equals(SceneHome.getDockLook(this));
+        int curTileW = Math.max(dp(40), Math.round(tileW * dockScale));
+        int curTileH = Math.max(dp(24), Math.round(tileH * dockScale));
+        int curGap = Math.max(dp(6), Math.round(gap * dockScale));
+
+        int focusGrowX = Math.round(curTileW * (FOCUS_SCALE - 1f) / 2f);
+        int focusGrowY = Math.round(curTileH * (FOCUS_SCALE - 1f) / 2f);
         int focusedRimMargin = dp(11);
         int dockPadH = focusGrowX + focusedRimMargin;
         int dockPadVScaled = focusGrowY + focusedRimMargin;
@@ -893,7 +972,7 @@ public class MainActivity extends Activity {
         }
         // Like tvOS, the home grid has no big title; only the folder gets a header.
         titleBox.setVisibility(folderMode ? View.VISIBLE : View.GONE);
-        chevron.setVisibility(folderMode ? View.GONE : View.VISIBLE);
+        chevron.setVisibility(View.GONE);
         shelfTitle.setText(I18n.s(this, "Other Apps", "Diğer Uygulamalar"));
         shelfHint.setText(I18n.s(this, "Back to return   \u00b7   Hold OK for options", "Dönmek için Geri   \u00b7   Seçenekler için OK'e basılı tutun"));
 
@@ -913,12 +992,13 @@ public class MainActivity extends Activity {
                 row.setClipChildren(false);
                 row.setClipToPadding(false);
                 if (i == 0 && hasDock()) {
-                    // tvOS dock: the top row sits on one frosted glass panel, centered with symmetrical focus margins.
-                    row.setPadding(dockPadH, dockPadVScaled, dockPadH, dockPadVScaled);
+                    int padH = isMac ? Math.round(dockPadH * 0.85f) : dockPadH;
+                    int padV = isMac ? Math.round(dockPadVScaled * 0.80f) : dockPadVScaled;
+                    row.setPadding(padH, padV, padH, padV);
                     LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                     rlp.gravity = Gravity.CENTER_HORIZONTAL;
-                    rlp.bottomMargin = dockGapBelow();
+                    rlp.bottomMargin = isMac ? dp(26) : dp(10);
                     row.setBackground(dockBackground());
                     dockRow = row;
                     content.addView(row, rlp);
@@ -931,11 +1011,88 @@ public class MainActivity extends Activity {
                     content.addView(row, rlp);
                 }
             }
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(tileW, ViewGroup.LayoutParams.WRAP_CONTENT);
-            if (!startNewRow) lp.leftMargin = gap;
-            row.addView(makeCell(shown.get(i), i, inDockRow, tileW, tileH, radius, labelH), lp);
+            int thisCardW = inDockRow ? curTileW : tileW;
+            int thisCardH = inDockRow ? curTileH : tileH;
+            int thisGap = inDockRow ? curGap : gap;
+            int thisRadius = Math.round(thisCardW * 0.16f);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(thisCardW, ViewGroup.LayoutParams.WRAP_CONTENT);
+            if (!startNewRow) lp.leftMargin = thisGap;
+            row.addView(makeCell(shown.get(i), i, inDockRow, thisCardW, thisCardH, thisRadius, labelH), lp);
         }
         content.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+    }
+
+    Bitmap getYouTubeBannerBitmap(int w, int h) {
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(out);
+        cv.drawColor(0xFFFFFFFF);
+
+        Bitmap raw = Scenes.loadAssetBitmap(this, "app-logos/youtube_full_logo.png", w, h);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        if (raw != null) {
+            float padRatio = 0.78f;
+            int targetW = Math.round(w * padRatio);
+            int targetH = Math.round(targetW * ((float) raw.getHeight() / Math.max(1, raw.getWidth())));
+            if (targetH > Math.round(h * 0.46f)) {
+                targetH = Math.round(h * 0.46f);
+                targetW = Math.round(targetH * ((float) raw.getWidth() / Math.max(1, raw.getHeight())));
+            }
+            int leftX = (w - targetW) / 2;
+            int topY = (h - targetH) / 2;
+            cv.drawBitmap(raw, null, new Rect(leftX, topY, leftX + targetW, topY + targetH), p);
+            if (raw != out) raw.recycle();
+        } else {
+            Bitmap fallback = Scenes.loadAssetBitmap(this, "app-logos/com.google.android.youtube.tv.png", w, h);
+            if (fallback != null) {
+                int targetH = Math.round(h * 0.55f);
+                int targetW = Math.round(targetH * ((float) fallback.getWidth() / Math.max(1, fallback.getHeight())));
+                int leftX = (w - targetW) / 2;
+                int topY = (h - targetH) / 2;
+                cv.drawBitmap(fallback, null, new Rect(leftX, topY, leftX + targetW, topY + targetH), p);
+                if (fallback != out) fallback.recycle();
+            } else {
+                Paint redP = new Paint(Paint.ANTI_ALIAS_FLAG);
+                redP.setColor(0xFFFF0000);
+                float padX = w * 0.28f;
+                float padY = h * 0.24f;
+                float pillR = h * 0.22f;
+                cv.drawRoundRect(new RectF(padX, padY, w - padX, h - padY), pillR, pillR, redP);
+
+                Paint triP = new Paint(Paint.ANTI_ALIAS_FLAG);
+                triP.setColor(0xFFFFFFFF);
+                Path tri = new Path();
+                float cx = w / 2f, cy = h / 2f;
+                float th = h * 0.16f, tw = h * 0.15f;
+                tri.moveTo(cx - tw * 0.5f, cy - th);
+                tri.lineTo(cx + tw * 0.7f, cy);
+                tri.lineTo(cx - tw * 0.5f, cy + th);
+                tri.close();
+                cv.drawPath(tri, triP);
+            }
+        }
+        return out;
+    }
+
+    Bitmap getSftvBannerBitmap(int w, int h) {
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(out);
+        cv.drawColor(0xFFFFFFFF);
+
+        Bitmap raw = Scenes.loadAssetBitmap(this, "app-logos/sendfiles_logo.png", w, h);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        if (raw != null) {
+            int targetH = Math.round(h * 0.70f);
+            int targetW = Math.round(targetH * ((float) raw.getWidth() / Math.max(1, raw.getHeight())));
+            if (targetW > Math.round(w * 0.80f)) {
+                targetW = Math.round(w * 0.80f);
+                targetH = Math.round(targetW * ((float) raw.getHeight() / Math.max(1, raw.getWidth())));
+            }
+            int leftX = (w - targetW) / 2;
+            int topY = (h - targetH) / 2;
+            cv.drawBitmap(raw, null, new Rect(leftX, topY, leftX + targetW, topY + targetH), p);
+            if (raw != out) raw.recycle();
+        }
+        return out;
     }
 
     View makeCell(AppEntry a, int index, boolean inDock, int cardW, int cardH, float cardRadius, int cellLabelH) {
@@ -943,20 +1100,29 @@ public class MainActivity extends Activity {
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setClipChildren(false);
 
+        boolean isYt = SceneHome.isYouTubePkg(a.pkg, a.key);
+        boolean isSftv = SceneHome.isSftvPkg(a.pkg, a.key);
+
         FrameLayout tile = new FrameLayout(this);
         tile.setFocusable(true);
         tile.setClickable(true);
         tile.setLongClickable(true);
         GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(cardRadius);
-        bg.setColor(a.banner != null ? 0xFF1C1C1E : a.color);
+        bg.setColor((isYt || isSftv) ? 0xFFFFFFFF : (a.banner != null ? 0xFF1C1C1E : a.color));
         tile.setBackground(bg);
-        tile.setOutlineProvider(roundedOutline(new float[]{cardRadius}));
-        tile.setClipToOutline(true);
+        applyShapeToTile(tile, bg, getIconShape(this), cardW, cardH);
         tile.setElevation(dp(3));
 
         ImageView iv = new ImageView(this);
-        if (a.banner != null) {
+        if (isYt) {
+            iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            iv.setImageBitmap(getYouTubeBannerBitmap(cardW, cardH));
+            tile.addView(iv, match());
+        } else if (isSftv) {
+            iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            iv.setImageBitmap(getSftvBannerBitmap(cardW, cardH));
+            tile.addView(iv, match());
+        } else if (a.banner != null) {
             iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
             iv.setImageDrawable(a.banner);
             tile.addView(iv, match());
@@ -975,7 +1141,11 @@ public class MainActivity extends Activity {
         tile.addView(topSheen, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, cardH / 2, Gravity.TOP));
 
         TextView label = text(15, Ui.font(this, "medium"), 0f);
-        label.setText(a.label);
+        String displayLabel = a.label;
+        if (isYt && ("TizenTube".equalsIgnoreCase(displayLabel) || "io.gh.reisxd.tizentube.cobalt".equals(a.pkg))) {
+            displayLabel = "YouTube";
+        }
+        label.setText(displayLabel);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
         label.setGravity(Gravity.CENTER);
@@ -1089,6 +1259,13 @@ public class MainActivity extends Activity {
     static final String CUSTOM_WALL_KEY = "custom";
 
     Bitmap makeWallpaper(String style) {
+        if (CustomMedia.hasCustomSceneWallpaper(this, 1)) {
+            Bitmap redditWall = CustomMedia.getCustomSceneWallpaper(this, 1, 1920, 1080);
+            if (redditWall != null && !redditWall.isRecycled()) {
+                Bitmap copy = redditWall.copy(Bitmap.Config.ARGB_8888, true);
+                return bakeShade(copy);
+            }
+        }
         if (CUSTOM_WALL_KEY.equals(style)) {
             Bitmap custom = CustomMedia.getCustomClassicWallpaper(this);
             if (custom != null && !custom.isRecycled()) {
@@ -1356,13 +1533,20 @@ public class MainActivity extends Activity {
         return dp(20);
     }
 
-    /** Frosted glass dock (tvOS): lush rounded corner radius, translucent fill, sheen and rim. */
+    public Bitmap getWallpaperBitmap() {
+        if (wallView != null && wallView.getDrawable() instanceof BitmapDrawable) {
+            Bitmap b = ((BitmapDrawable) wallView.getDrawable()).getBitmap();
+            if (b != null && !b.isRecycled()) return b;
+        }
+        if (wallBlur != null && !wallBlur.isRecycled()) return wallBlur;
+        return glassBg;
+    }
+
+    /** Liquid glass dock (Apple): lush rounded corner radius, translucent fill, specular sheen and hairline rim. */
     Drawable dockBackground() {
-        float dockRad = Math.max(dp(24), radius * 1.65f);
-        LiquidGlass g = new LiquidGlass(dockRad, 0x14FFFFFF, glassSource, screenW, screenH, unit);
-        g.lens = dp(12);
-        g.rimStrength = 0.28f;
-        return g;
+        boolean isMac = SceneHome.DOCK_LOOK_MACOS.equals(SceneHome.getDockLook(this));
+        float dockRad = isMac ? dp(30) : dp(20);
+        return new SceneHome.AppleLiquidGlass(dockRad, isMac);
     }
 
     Bitmap grainBitmap;
@@ -2113,7 +2297,9 @@ public class MainActivity extends Activity {
 
         heroInfo.animate().alpha(a).setDuration(dur).start();
         heroDots.animate().alpha(a).setDuration(dur).start();
-        chevron.animate().alpha(1f - a).setDuration(dur).start();
+        if (chevron != null && chevron.getParent() != null) {
+            chevron.animate().alpha(1f - a).setDuration(dur).start();
+        }
         heroBack.animate().alpha(0f).setDuration(dur).start();
         handler.removeCallbacks(heroAdvance);
         if (show) scheduleAdvance();
@@ -3378,9 +3564,13 @@ public class MainActivity extends Activity {
             ComponentName cn = new ComponentName(ai.packageName, ai.name);
             e.pkg = ai.packageName;
             e.key = cn.flattenToShortString();
-            e.defaultLabel = TV_SETTINGS.equals(e.pkg)
-                    ? I18n.s(this, "Settings", "Ayarlar")
-                    : ri.loadLabel(pm).toString();
+            if (SceneHome.isYouTubePkg(ai.packageName, cn.flattenToShortString())) {
+                e.defaultLabel = "YouTube";
+            } else if (TV_SETTINGS.equals(e.pkg)) {
+                e.defaultLabel = I18n.s(this, "Settings", "Ayarlar");
+            } else {
+                e.defaultLabel = ri.loadLabel(pm).toString();
+            }
             e.label = getCustomAppName(this, e.key, e.pkg, e.defaultLabel);
             e.banner = leanback ? ai.loadBanner(pm) : null;
             e.icon = ri.loadIcon(pm);
@@ -3721,7 +3911,7 @@ public class MainActivity extends Activity {
         FrameLayout layer = new FrameLayout(this);
         layer.setClickable(true);
         layer.setClipChildren(false);
-        addBlurredBackdrop(layer, 0x8C000000);
+        layer.setOnClickListener(v -> closeProfilePicker());
 
         List<View> cells = new ArrayList<>();
         FrameLayout panel = ControlPanelOverlay.buildControlPanelView(

@@ -8,9 +8,12 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
 import android.graphics.LinearGradient;
 import android.graphics.Outline;
 import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -71,6 +74,311 @@ final class SceneHome {
 
     private final Map<String, Bitmap> logoCache = new HashMap<>();
     private Bitmap demoArt1, demoArt2, demoArt3;
+
+    public static final String DOCK_LOOK_MACOS = "macos";
+    public static final String DOCK_LOOK_TVOS = "tvos";
+
+    public static String getDockLook(Context c) {
+        return c.getSharedPreferences("home_prefs", Context.MODE_PRIVATE)
+                .getString("dock_look", DOCK_LOOK_TVOS);
+    }
+
+    public static void setDockLook(Context c, String look) {
+        c.getSharedPreferences("home_prefs", Context.MODE_PRIVATE)
+                .edit().putString("dock_look", look).apply();
+    }
+
+    public static boolean isYouTubePkg(String pkg, String key) {
+        String p = (pkg != null ? pkg : "").toLowerCase();
+        String k = (key != null ? key : "").toLowerCase();
+        return p.contains("youtube") || p.contains("tizentube") || p.contains("smarttube")
+                || k.contains("youtube") || k.contains("tizentube") || k.contains("smarttube");
+    }
+
+    public static boolean isSftvPkg(String pkg, String key) {
+        String p = (pkg != null ? pkg : "").toLowerCase();
+        String k = (key != null ? key : "").toLowerCase();
+        return p.contains("sendfilestotv") || k.contains("sendfilestotv");
+    }
+
+    public static class AppleLiquidGlass extends Drawable {
+        private final float radius;
+        private final boolean isMac;
+        private final float d = android.content.res.Resources.getSystem().getDisplayMetrics().density;
+
+        private final Paint magPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final Paint lensPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint topGleamPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint innerRimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint shadowPaint1 = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint shadowPaint2 = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        private final RectF bounds = new RectF();
+        private final RectF s1 = new RectF(), s2 = new RectF(), lensRect = new RectF();
+        private final int[] loc = new int[2];
+        private final android.graphics.Matrix m = new android.graphics.Matrix();
+        private final android.graphics.Matrix lensMatrix = new android.graphics.Matrix();
+
+        private Bitmap shaderFor;
+        private android.graphics.BitmapShader bgShader;
+        private Bitmap lastColorSampledBmp;
+
+        private float dp(float v) { return v * d; }
+
+        public AppleLiquidGlass(float radius, boolean isMac) {
+            this.radius = radius;
+            this.isMac = isMac;
+
+            // Ultra-clear crystalline body tint (no milky/white haze)
+            fillPaint.setStyle(Paint.Style.FILL);
+            fillPaint.setColor(isMac ? 0x0EFFFFFF : 0x08FFFFFF);
+
+            // Optical lens refraction along the curved bevel
+            lensPaint.setStyle(Paint.Style.STROKE);
+            lensPaint.setStrokeWidth(dp(5.5f));
+
+            // Dynamic rim matching wallpaper colors around the dock
+            rimPaint.setStyle(Paint.Style.STROKE);
+            rimPaint.setStrokeWidth(dp(2.4f));
+
+            // Delicate hairline glint on top edge (no foggy white shadow)
+            topGleamPaint.setStyle(Paint.Style.STROKE);
+            topGleamPaint.setStrokeWidth(dp(1.2f));
+
+            // Soft inner refraction contour
+            innerRimPaint.setStyle(Paint.Style.STROKE);
+            innerRimPaint.setStrokeWidth(dp(0.8f));
+            innerRimPaint.setColor(0x28FFFFFF);
+
+            // 3D Soft floating glass drop shadows
+            shadowPaint1.setStyle(Paint.Style.FILL);
+            shadowPaint1.setColor(0x40000000);
+
+            shadowPaint2.setStyle(Paint.Style.FILL);
+            shadowPaint2.setColor(0x20000000);
+        }
+
+        private int sampleWallpaper(Bitmap bmp, int sx, int sy, int fallback) {
+            if (bmp == null || bmp.isRecycled()) return fallback;
+            MainActivity host = MainActivity.activeInstance;
+            int sw = host != null && host.screenW > 0 ? host.screenW : 1920;
+            int sh = host != null && host.screenH > 0 ? host.screenH : 1080;
+            int bx = Math.max(0, Math.min(bmp.getWidth() - 1, (int) (sx * (bmp.getWidth() / (float) sw))));
+            int by = Math.max(0, Math.min(bmp.getHeight() - 1, (int) (sy * (bmp.getHeight() / (float) sh))));
+            try {
+                return bmp.getPixel(bx, by);
+            } catch (Exception e) {
+                return fallback;
+            }
+        }
+
+        private int glassGlowColor(int color, float boost, int alpha) {
+            int r = Color.red(color);
+            int g = Color.green(color);
+            int b = Color.blue(color);
+            r = Math.min(255, (int) (r * boost + 35));
+            g = Math.min(255, (int) (g * boost + 35));
+            b = Math.min(255, (int) (b * boost + 35));
+            return Color.argb(alpha, r, g, b);
+        }
+
+        private void updateDynamicRim(Bitmap wp) {
+            if (wp == null || wp.isRecycled()) return;
+            float w = bounds.width();
+            float h = bounds.height();
+            if (w <= 0 || h <= 0) return;
+
+            int leftX = (int) (loc[0] - dp(18));
+            int rightX = (int) (loc[0] + w + dp(18));
+            int midY = (int) (loc[1] + h * 0.5f);
+            int topY = (int) (loc[1] - dp(16));
+            int botY = (int) (loc[1] + h + dp(16));
+            int midX = (int) (loc[0] + w * 0.5f);
+
+            int rawL = sampleWallpaper(wp, leftX, midY, 0xFF354055);
+            int rawR = sampleWallpaper(wp, rightX, midY, 0xFF354055);
+            int rawT = sampleWallpaper(wp, midX, topY, 0xFF455065);
+            int rawB = sampleWallpaper(wp, midX, botY, 0xFF202535);
+
+            int cT = glassGlowColor(rawT, 1.4f, 0xE5);
+            int cL = glassGlowColor(rawL, 1.4f, 0xD0);
+            int cR = glassGlowColor(rawR, 1.4f, 0xD0);
+            int cB = glassGlowColor(rawB, 1.3f, 0xB5);
+
+            // Rim gradient matching surrounding wallpaper colors exactly
+            rimPaint.setShader(new LinearGradient(
+                    bounds.left, bounds.top, bounds.right, bounds.bottom,
+                    new int[]{cT, cL, 0x30FFFFFF, cR, cB},
+                    new float[]{0f, 0.22f, 0.50f, 0.78f, 1f},
+                    Shader.TileMode.CLAMP));
+
+            // Razor-thin top hairline gleam: pure light catching top rim
+            topGleamPaint.setShader(new LinearGradient(
+                    bounds.left + w * 0.2f, bounds.top, bounds.right - w * 0.2f, bounds.top,
+                    new int[]{0x00FFFFFF, 0x90FFFFFF, 0x90FFFFFF, 0x00FFFFFF},
+                    new float[]{0f, 0.35f, 0.65f, 1f},
+                    Shader.TileMode.CLAMP));
+
+            lastColorSampledBmp = wp;
+        }
+
+        @Override
+        protected void onBoundsChange(Rect b) {
+            bounds.set(b);
+            s1.set(bounds.left + dp(2), bounds.top + dp(4), bounds.right - dp(2), bounds.bottom + dp(9));
+            s2.set(bounds.left + dp(4), bounds.top + dp(8), bounds.right - dp(4), bounds.bottom + dp(18));
+            lastColorSampledBmp = null;
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            float w = bounds.width();
+            float h = bounds.height();
+            float rad = isMac ? Math.min(w, h) * 0.44f : radius;
+
+            // 1. Soft 3D drop shadow (elevates glass above wallpaper)
+            canvas.drawRoundRect(s2, rad, rad, shadowPaint2);
+            canvas.drawRoundRect(s1, rad, rad, shadowPaint1);
+
+            // 2. Optical Magnifying Glass Effect
+            MainActivity host = MainActivity.activeInstance;
+            Bitmap wp = (host != null) ? host.getWallpaperBitmap() : null;
+            if (wp != null && !wp.isRecycled()) {
+                Object cb = getCallback();
+                if (cb instanceof View) ((View) cb).getLocationOnScreen(loc);
+
+                if (wp != shaderFor) {
+                    bgShader = new android.graphics.BitmapShader(wp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                    magPaint.setShader(bgShader);
+                    lensPaint.setShader(bgShader);
+                    shaderFor = wp;
+                    lastColorSampledBmp = null;
+                }
+
+                if (lastColorSampledBmp != wp) {
+                    updateDynamicRim(wp);
+                }
+
+                int sw = host.screenW > 0 ? host.screenW : 1920;
+                int sh = host.screenH > 0 ? host.screenH : 1080;
+
+                // Base matrix maps wallpaper to screen position under the dock
+                m.reset();
+                m.setScale(sw / (float) wp.getWidth(), sh / (float) wp.getHeight());
+                m.postTranslate(bounds.left - loc[0], bounds.top - loc[1]);
+
+                // MAGNIFYING EFFECT: Zoom in by 1.12x centered on dock bounds!
+                m.postScale(1.12f, 1.12f, bounds.centerX(), bounds.centerY());
+                bgShader.setLocalMatrix(m);
+                canvas.drawRoundRect(bounds, rad, rad, magPaint);
+
+                // Optical lens refraction around outer bevel curve (zoom 1.18x)
+                lensMatrix.set(m);
+                lensMatrix.postScale(1.05f, 1.05f, bounds.centerX(), bounds.centerY());
+                bgShader.setLocalMatrix(lensMatrix);
+                lensPaint.setAlpha(140);
+                float lw = lensPaint.getStrokeWidth();
+                lensRect.set(bounds.left + lw / 2f, bounds.top + lw / 2f,
+                        bounds.right - lw / 2f, bounds.bottom - lw / 2f);
+                canvas.drawRoundRect(lensRect, rad - lw / 2f, rad - lw / 2f, lensPaint);
+                bgShader.setLocalMatrix(m);
+            }
+
+            // 3. Ultra-clear glass body tint
+            canvas.drawRoundRect(bounds, rad, rad, fillPaint);
+
+            // 4. Dynamic wallpaper-matching chromatic outer rim
+            float in = rimPaint.getStrokeWidth() / 2f;
+            canvas.drawRoundRect(bounds.left + in, bounds.top + in, bounds.right - in, bounds.bottom - in,
+                    rad - in, rad - in, rimPaint);
+
+            // 5. Razor-thin top rim hairline glint (clean direct light reflection, no white shadow)
+            float inTop = topGleamPaint.getStrokeWidth() / 2f;
+            canvas.drawRoundRect(bounds.left + inTop, bounds.top + inTop, bounds.right - inTop, bounds.bottom - inTop,
+                    rad - inTop, rad - inTop, topGleamPaint);
+
+            // 6. Inner glass refraction contour line
+            float in2 = in + dp(1.2f);
+            canvas.drawRoundRect(bounds.left + in2, bounds.top + in2, bounds.right - in2, bounds.bottom - in2,
+                    Math.max(0, rad - in2), Math.max(0, rad - in2), innerRimPaint);
+        }
+
+        @Override public void setAlpha(int a) { fillPaint.setAlpha(a); }
+        @Override public void setColorFilter(ColorFilter cf) { fillPaint.setColorFilter(cf); }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+
+    Bitmap getOfficialYouTubeLogo() {
+        int s = 256;
+        Bitmap out = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(out);
+        cv.drawColor(0xFFFFFFFF);
+
+        Bitmap full = Scenes.loadAssetBitmap(host, "app-logos/youtube_full_logo.png", s, s);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        if (full != null) {
+            int targetW = Math.round(s * 0.86f);
+            int targetH = Math.round(targetW * ((float) full.getHeight() / Math.max(1, full.getWidth())));
+            int leftX = (s - targetW) / 2;
+            int topY = (s - targetH) / 2;
+            cv.drawBitmap(full, null, new Rect(leftX, topY, leftX + targetW, topY + targetH), p);
+            if (full != out) full.recycle();
+        } else {
+            Bitmap raw = Scenes.loadAssetBitmap(host, "app-logos/com.google.android.youtube.tv.png", 256, 256);
+            if (raw != null) {
+                int targetH = Math.round(s * 0.62f);
+                int targetW = Math.round(targetH * ((float) raw.getWidth() / Math.max(1, raw.getHeight())));
+                int leftX = (s - targetW) / 2;
+                int topY = (s - targetH) / 2;
+                cv.drawBitmap(raw, null, new Rect(leftX, topY, leftX + targetW, topY + targetH), p);
+                if (raw != out) raw.recycle();
+            } else {
+                Paint redP = new Paint(Paint.ANTI_ALIAS_FLAG);
+                redP.setColor(0xFFFF0000);
+                float padX = s * 0.16f;
+                float padY = s * 0.28f;
+                float pillR = s * 0.14f;
+                cv.drawRoundRect(new RectF(padX, padY, s - padX, s - padY), pillR, pillR, redP);
+
+                Paint triP = new Paint(Paint.ANTI_ALIAS_FLAG);
+                triP.setColor(0xFFFFFFFF);
+                Path tri = new Path();
+                float cx = s / 2f, cy = s / 2f;
+                float th = s * 0.13f, tw = s * 0.12f;
+                tri.moveTo(cx - tw * 0.5f, cy - th);
+                tri.lineTo(cx + tw * 0.7f, cy);
+                tri.lineTo(cx - tw * 0.5f, cy + th);
+                tri.close();
+                cv.drawPath(tri, triP);
+            }
+        }
+        return out;
+    }
+
+    Bitmap getOfficialSftvLogo() {
+        int s = 256;
+        Bitmap out = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(out);
+        cv.drawColor(0xFFFFFFFF);
+
+        Bitmap raw = Scenes.loadAssetBitmap(host, "app-logos/sendfiles_logo.png", s, s);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        if (raw != null) {
+            int targetH = Math.round(s * 0.65f);
+            int targetW = Math.round(targetH * ((float) raw.getWidth() / Math.max(1, raw.getHeight())));
+            if (targetW > Math.round(s * 0.82f)) {
+                targetW = Math.round(s * 0.82f);
+                targetH = Math.round(targetW * ((float) raw.getHeight() / Math.max(1, raw.getWidth())));
+            }
+            int leftX = (s - targetW) / 2;
+            int topY = (s - targetH) / 2;
+            cv.drawBitmap(raw, null, new Rect(leftX, topY, leftX + targetW, topY + targetH), p);
+            if (raw != out) raw.recycle();
+        }
+        return out;
+    }
 
     boolean moreExpanded = false;
     boolean backDownInHome = false;
@@ -254,34 +562,8 @@ final class SceneHome {
     }
 
     void refreshWhoBar() {
-        if (whoBar == null) return;
-        whoBar.removeAllViews();
-        List<Profiles.Profile> ps = Profiles.list(host);
-        if (ps.size() <= 1) {
+        if (whoBar != null) {
             whoBar.setVisibility(View.GONE);
-            return;
-        }
-        whoBar.setVisibility(View.VISIBLE);
-        String curId = Profiles.current(host).id;
-        for (Profiles.Profile p : ps) {
-            boolean active = p.id.equals(curId);
-            TextView pill = new TextView(host);
-            Ui.textSize(pill, 11f);
-            pill.setTypeface(Ui.font(host, "semibold"));
-            pill.setText(I18n.profileName(host, p.name));
-            pill.setPadding(dp(13), dp(6), dp(13), dp(6));
-            pill.setSingleLine(true);
-            if (active) {
-                GradientDrawable abg = new GradientDrawable();
-                abg.setCornerRadius(dp(18));
-                abg.setColor(0xF2FFFFFF);
-                pill.setBackground(abg);
-                pill.setTextColor(0xFF111114);
-            } else {
-                pill.setTextColor(0xB8F4F4F6);
-            }
-            whoBar.addView(pill, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
     }
 
@@ -669,15 +951,11 @@ final class SceneHome {
         dockBox.setGravity(Gravity.CENTER_HORIZONTAL);
         dockBox.setClipChildren(false);
         dockBox.setClipToPadding(false);
-        int padH = dp(13), padV = dp(10);
+        boolean isMacInit = DOCK_LOOK_MACOS.equals(getDockLook(host));
+        int padH = isMacInit ? dp(14) : dp(18), padV = isMacInit ? dp(8) : dp(10);
         dockBox.setPadding(padH, padV, padH, padV);
-
-        MainActivity.LiquidGlass dockGlass = new MainActivity.LiquidGlass(
-                dp(23), 0x541E141C, host.glassSource, host.screenW, host.screenH, host.unit);
-        dockGlass.lens = dp(10);
-        dockGlass.rimStrength = 0.38f;
-        dockBox.setBackground(dockGlass);
-        dockBox.setElevation(dp(8));
+        dockBox.setBackground(new AppleLiquidGlass(isMacInit ? dp(28) : dp(20), isMacInit));
+        dockBox.setElevation(isMacInit ? dp(14) : dp(8));
 
         dockContainer.addView(dockBox, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -685,7 +963,7 @@ final class SceneHome {
         FrameLayout.LayoutParams dlp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        dlp.bottomMargin = dp(14);
+        dlp.bottomMargin = isMacInit ? dp(20) : dp(10);
         overlay.addView(dockContainer, dlp);
     }
 
@@ -797,11 +1075,22 @@ final class SceneHome {
         dockEntries.clear();
 
         float scale = Scenes.getDockScaleFactor(host);
+        boolean isMac = DOCK_LOOK_MACOS.equals(getDockLook(host));
+        float rad = isMac ? dp(28) * scale : dp(20) * scale;
+        dockBox.setBackground(new AppleLiquidGlass(rad, isMac));
+        dockBox.setElevation(isMac ? dp(14) : dp(8));
+
         int tileSize = Math.max(dp(26), Math.round(dp(54) * scale));
         int tileGap = Math.max(dp(4), Math.round(dp(10) * scale));
-        int padH = Math.max(dp(8), Math.round(dp(13) * scale));
-        int padV = Math.max(dp(6), Math.round(dp(10) * scale));
+        int padH = Math.max(dp(8), Math.round((isMac ? dp(14) : dp(18)) * scale));
+        int padV = Math.max(dp(6), Math.round((isMac ? dp(8) : dp(10)) * scale));
         dockBox.setPadding(padH, padV, padH, padV);
+
+        if (dockContainer != null && dockContainer.getLayoutParams() instanceof FrameLayout.LayoutParams) {
+            FrameLayout.LayoutParams dlp = (FrameLayout.LayoutParams) dockContainer.getLayoutParams();
+            dlp.bottomMargin = isMac ? dp(20) : dp(10);
+            dockContainer.setLayoutParams(dlp);
+        }
 
         int maxDockInnerW = Math.max(tileSize * 4, host.screenW - dp(72) - 2 * padH);
         int maxColsFit = Math.max(4, (maxDockInnerW + tileGap) / (tileSize + tileGap));
@@ -909,20 +1198,23 @@ final class SceneHome {
 
         boolean isGear = GEAR_KEY.equals(a.key);
         boolean isMore = MORE_KEY.equals(a.key);
+        boolean isYt = isYouTubePkg(a.pkg, a.key);
+        boolean isSftv = isSftvPkg(a.pkg, a.key);
 
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(rad);
         if (isGear || isMore) {
             bg.setColor(0x1EFFFFFF);
             bg.setStroke(Math.max(1, dp(0.8f)), 0x24FFFFFF);
+        } else if (isYt || isSftv) {
+            bg.setColor(0xFFFFFFFF);
         } else {
             boolean hasCustom = CustomMedia.hasCustomAppIcon(host, a.key, a.pkg);
             Bitmap logo = getSquareAppLogo(a.pkg);
             bg.setColor((hasCustom || logo != null) ? 0xFF141519 : (a.color != 0 ? a.color : 0xFF1A1C22));
         }
         tile.setBackground(bg);
-        tile.setOutlineProvider(host.roundedOutline(new float[]{rad}));
-        tile.setClipToOutline(true);
+        MainActivity.applyShapeToTile(tile, bg, MainActivity.getIconShape(host), size, size);
         // Zero elevation on dock tiles avoids Android's dark inner/outer shadow artifact bleeding through translucent Gear/More tiles
         tile.setElevation(0f);
 
@@ -938,13 +1230,13 @@ final class SceneHome {
             tile.addView(iv, host.match());
         } else {
             boolean hasCustom = CustomMedia.hasCustomAppIcon(host, a.key, a.pkg);
-            Bitmap sq = getSquareAppIcon(a);
+            Bitmap sq = isYt ? getOfficialYouTubeLogo() : (isSftv ? getOfficialSftvLogo() : getSquareAppIcon(a));
             if (sq != null) {
                 iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 iv.setImageBitmap(sq);
                 // Custom icons from App Icon Editor already match the exact preview bounds (1.0f);
                 // built-in app icons zoom slightly (+5%) for edge-to-edge infill
-                float z = hasCustom ? 1.0f : 1.05f;
+                float z = (hasCustom || isYt || isSftv) ? 1.0f : 1.05f;
                 iv.setScaleX(z);
                 iv.setScaleY(z);
                 tile.addView(iv, host.match());
@@ -1208,6 +1500,12 @@ final class SceneHome {
 
     Bitmap getSquareAppIcon(MainActivity.AppEntry a) {
         if (a == null) return null;
+        if (isYouTubePkg(a.pkg, a.key)) {
+            return getOfficialYouTubeLogo();
+        }
+        if (isSftvPkg(a.pkg, a.key)) {
+            return getOfficialSftvLogo();
+        }
         if (CustomMedia.hasCustomAppIcon(host, a.key, a.pkg)) {
             Bitmap custom = CustomMedia.getCustomAppIcon(host, a.key, a.pkg);
             if (custom != null && !custom.isRecycled()) {
@@ -1365,6 +1663,12 @@ final class SceneHome {
 
     Bitmap getSquareAppLogo(String pkg) {
         if (pkg == null || pkg.isEmpty()) return null;
+        if (isYouTubePkg(pkg, null)) {
+            return getOfficialYouTubeLogo();
+        }
+        if (isSftvPkg(pkg, null)) {
+            return getOfficialSftvLogo();
+        }
         if (logoCache.containsKey(pkg)) return logoCache.get(pkg);
         String assetName = mapPkgToLogoAsset(pkg);
         Bitmap bmp = null;
@@ -1401,6 +1705,7 @@ final class SceneHome {
             case "com.google.android.youtube.tvkids":
             case "org.smarttube.stable":
             case "com.liskovsoft.smarttubetv.beta":
+            case "io.gh.reisxd.tizentube.cobalt":
                 return "com.google.android.youtube.tv.png";
             case "com.netflix.ninja":
                 return "com.netflix.ninja.png";
@@ -1465,10 +1770,7 @@ final class SceneHome {
         card.setClipToPadding(true);
         int pad = dp(8);
         card.setPadding(pad, pad, pad, pad);
-        MainActivity.LiquidGlass glass = new MainActivity.LiquidGlass(
-                dp(18), 0xBD1C181E, host.glassSource, host.screenW, host.screenH, host.unit);
-        glass.lens = dp(7);
-        card.setBackground(glass);
+        card.setBackground(new AppleLiquidGlass(dp(18), true));
         card.setOutlineProvider(host.roundedOutline(new float[]{dp(18)}));
         card.setClipToOutline(true);
         card.setElevation(dp(24));
@@ -1476,8 +1778,8 @@ final class SceneHome {
         View btnHomeSettings = makeGearOptionRow(
                 "sliders",
                 I18n.s(host, "Home settings", "Ana ekran ayarları"),
-                I18n.s(host, "Language, weather, scenes, apps and people",
-                        "Dil, hava durumu, sahneler, uygulamalar ve kişiler"),
+                I18n.s(host, "Dock, wallpapers, apps and controls",
+                        "Dock, duvar kağıtları, uygulamalar ve denetimler"),
                 () -> {
                     closeSheet();
                     host.returningFromSettings = true;

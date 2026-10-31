@@ -810,6 +810,11 @@ public final class CustomMedia {
         }
     }
 
+    public static long getCustomClassicWallpaperTs(Context c) {
+        if (c == null) return 0L;
+        return prefs(c).getLong(KEY_CLASSIC_WALL_TS, 0L);
+    }
+
     public static Bitmap getCustomClassicWallpaper(Context c) {
         if (c == null) return null;
         long ts = prefs(c).getLong(KEY_CLASSIC_WALL_TS, 0L);

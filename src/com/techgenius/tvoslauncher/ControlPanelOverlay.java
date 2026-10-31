@@ -400,8 +400,9 @@ public final class ControlPanelOverlay {
         final android.graphics.drawable.Drawable idleBg;
         if (glassSource != null) {
             MainActivity.LiquidGlass glass = new MainActivity.LiquidGlass(
-                    radius, 0x24FFFFFF, glassSource, screenW, screenH, unit).adaptive().darker(0x59);
+                    radius, 0x2EFFFFFF, glassSource, screenW, screenH, unit).adaptive();
             glass.lens = dp(unit, 7);
+            glass.rimStrength = 0.85f;
             idleBg = glass;
         } else {
             GradientDrawable darkGlass = new GradientDrawable();

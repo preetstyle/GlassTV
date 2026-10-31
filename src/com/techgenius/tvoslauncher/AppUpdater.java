@@ -61,7 +61,7 @@ public final class AppUpdater {
     }
 
     public static boolean isAutoUpdateEnabled(Context c) {
-        return prefs(c).getBoolean(KEY_AUTO_UPDATE, true);
+        return prefs(c).getBoolean(KEY_AUTO_UPDATE, false);
     }
 
     public static void setAutoUpdateEnabled(Context c, boolean enabled) {
@@ -211,24 +211,8 @@ public final class AppUpdater {
      * in the background and automatically pulls & installs if a newer release is found.
      */
     public static void checkAutoUpdateIfNeeded(Activity activity) {
-        if (activity == null || activity.isFinishing()) return;
-        if (!isAutoUpdateEnabled(activity)) return;
-        if (checking || downloading) return;
-        long last = prefs(activity).getLong(KEY_LAST_CHECK, 0L);
-        long now = System.currentTimeMillis();
-        // Throttle automatic background checks to once every 15 minutes
-        if (now - last < 15 * 60 * 1000L) return;
-
-        checkForUpdates(activity, (success, latestVersion, downloadUrl, updateAvailable, errorMsg) -> {
-            if (success && updateAvailable && !activity.isFinishing()) {
-                Toast.makeText(activity,
-                        I18n.s(activity,
-                                "Updating tvOS Launcher to v" + latestVersion + "…",
-                                "tvOS Launcher v" + latestVersion + " sürümüne güncelleniyor…"),
-                        Toast.LENGTH_SHORT).show();
-                downloadAndInstall(activity, downloadUrl, latestVersion, true, null);
-            }
-        });
+        // Disabled to prevent automatic popups that would overwrite custom customizations
+        return;
     }
 
     /**

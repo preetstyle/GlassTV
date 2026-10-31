@@ -101,6 +101,15 @@ final class SceneHome {
         return p.contains("sendfilestotv") || k.contains("sendfilestotv");
     }
 
+    public static boolean isSettingsPkg(String pkg, String key) {
+        String p = (pkg != null ? pkg : "").toLowerCase();
+        String k = (key != null ? key : "").toLowerCase();
+        return GEAR_KEY.equals(key) || MainActivity.SETTINGS_KEY.equals(key)
+                || MainActivity.TV_SETTINGS.equals(pkg)
+                || p.contains("tv.settings") || p.equals("com.android.settings")
+                || k.contains("settings");
+    }
+
     public static class AppleLiquidGlass extends Drawable {
         private final float radius;
         private final boolean isMac;
@@ -359,24 +368,21 @@ final class SceneHome {
 
     Bitmap getOfficialSftvLogo() {
         int s = 256;
+        Bitmap raw = Scenes.loadAssetBitmap(host, "app-logos/sendfiles_logo.png", s, s);
+        if (raw != null) return raw;
         Bitmap out = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(out);
         cv.drawColor(0xFFFFFFFF);
+        return out;
+    }
 
-        Bitmap raw = Scenes.loadAssetBitmap(host, "app-logos/sendfiles_logo.png", s, s);
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-        if (raw != null) {
-            int targetH = Math.round(s * 0.65f);
-            int targetW = Math.round(targetH * ((float) raw.getWidth() / Math.max(1, raw.getHeight())));
-            if (targetW > Math.round(s * 0.82f)) {
-                targetW = Math.round(s * 0.82f);
-                targetH = Math.round(targetW * ((float) raw.getHeight() / Math.max(1, raw.getWidth())));
-            }
-            int leftX = (s - targetW) / 2;
-            int topY = (s - targetH) / 2;
-            cv.drawBitmap(raw, null, new Rect(leftX, topY, leftX + targetW, topY + targetH), p);
-            if (raw != out) raw.recycle();
-        }
+    Bitmap getOfficialSettingsLogo() {
+        int s = 256;
+        Bitmap raw = Scenes.loadAssetBitmap(host, "app-logos/settings_gear.png", s, s);
+        if (raw != null) return raw;
+        Bitmap out = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(out);
+        cv.drawColor(0xFF97999D);
         return out;
     }
 
@@ -1203,7 +1209,9 @@ final class SceneHome {
 
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(rad);
-        if (isGear || isMore) {
+        if (isGear) {
+            bg.setColor(0xFF97999D);
+        } else if (isMore) {
             bg.setColor(0x1EFFFFFF);
             bg.setStroke(Math.max(1, dp(0.8f)), 0x24FFFFFF);
         } else if (isYt || isSftv) {
@@ -1215,14 +1223,14 @@ final class SceneHome {
         }
         tile.setBackground(bg);
         MainActivity.applyShapeToTile(tile, bg, MainActivity.getIconShape(host), size, size);
-        // Zero elevation on dock tiles avoids Android's dark inner/outer shadow artifact bleeding through translucent Gear/More tiles
+        // Zero elevation on dock tiles avoids Android's dark inner/outer shadow artifact bleeding through translucent More tiles
         tile.setElevation(0f);
 
         int glyphSize = Math.max(dp(14), Math.round(dp(26) * scale));
         ImageView iv = new ImageView(host);
         if (isGear) {
-            iv.setScaleType(ImageView.ScaleType.CENTER);
-            iv.setImageBitmap(Glyphs.get("gear", glyphSize, 0xEBF4F4F6));
+            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            iv.setImageBitmap(getOfficialSettingsLogo());
             tile.addView(iv, host.match());
         } else if (isMore) {
             iv.setScaleType(ImageView.ScaleType.CENTER);
@@ -1270,7 +1278,7 @@ final class SceneHome {
                 }
                 v.animate().withLayer().scaleX(1.13f).scaleY(1.13f)
                         .translationY(0f)
-                        .translationZ(isGear || isMore ? 0f : dp(8))
+                        .translationZ(isMore ? 0f : dp(8))
                         .setDuration(190).setInterpolator(MainActivity.LIFT).start();
             } else {
                 v.animate().withLayer().scaleX(1f).scaleY(1f)
@@ -1506,6 +1514,9 @@ final class SceneHome {
         if (isSftvPkg(a.pkg, a.key)) {
             return getOfficialSftvLogo();
         }
+        if (isSettingsPkg(a.pkg, a.key)) {
+            return getOfficialSettingsLogo();
+        }
         if (CustomMedia.hasCustomAppIcon(host, a.key, a.pkg)) {
             Bitmap custom = CustomMedia.getCustomAppIcon(host, a.key, a.pkg);
             if (custom != null && !custom.isRecycled()) {
@@ -1541,6 +1552,9 @@ final class SceneHome {
             Bitmap g = Glyphs.get("input", Math.round(s * 0.52f), Color.WHITE);
             c.drawBitmap(g, (s - g.getWidth()) / 2f, (s - g.getHeight()) / 2f, null);
             return out;
+        }
+        if (isSettingsPkg(a.pkg, a.key) || (host != null && host.isSettings(a))) {
+            return getOfficialSettingsLogo();
         }
         if (MainActivity.PRESENT_KEY.equals(a.key)) {
             p.setShader(new LinearGradient(0, 0, 0, s, 0xFF5682FF, 0xFF2B50CC, Shader.TileMode.CLAMP));
@@ -1668,6 +1682,9 @@ final class SceneHome {
         }
         if (isSftvPkg(pkg, null)) {
             return getOfficialSftvLogo();
+        }
+        if (isSettingsPkg(pkg, null)) {
+            return getOfficialSettingsLogo();
         }
         if (logoCache.containsKey(pkg)) return logoCache.get(pkg);
         String assetName = mapPkgToLogoAsset(pkg);

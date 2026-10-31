@@ -1078,19 +1078,45 @@ public class MainActivity extends Activity {
         Canvas cv = new Canvas(out);
         cv.drawColor(0xFFFFFFFF);
 
-        Bitmap raw = Scenes.loadAssetBitmap(this, "app-logos/sendfiles_logo.png", w, h);
+        Bitmap raw = Scenes.loadAssetBitmap(this, "app-logos/sendfiles_banner.png", w, h);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         if (raw != null) {
-            int targetH = Math.round(h * 0.70f);
-            int targetW = Math.round(targetH * ((float) raw.getWidth() / Math.max(1, raw.getHeight())));
-            if (targetW > Math.round(w * 0.80f)) {
-                targetW = Math.round(w * 0.80f);
-                targetH = Math.round(targetW * ((float) raw.getHeight() / Math.max(1, raw.getWidth())));
-            }
-            int leftX = (w - targetW) / 2;
-            int topY = (h - targetH) / 2;
-            cv.drawBitmap(raw, null, new Rect(leftX, topY, leftX + targetW, topY + targetH), p);
+            cv.drawBitmap(raw, null, new Rect(0, 0, w, h), p);
             if (raw != out) raw.recycle();
+        } else {
+            Bitmap sq = Scenes.loadAssetBitmap(this, "app-logos/sendfiles_logo.png", w, h);
+            if (sq != null) {
+                int targetH = Math.round(h * 0.75f);
+                int targetW = targetH;
+                int leftX = (w - targetW) / 2;
+                int topY = (h - targetH) / 2;
+                cv.drawBitmap(sq, null, new Rect(leftX, topY, leftX + targetW, topY + targetH), p);
+                if (sq != out) sq.recycle();
+            }
+        }
+        return out;
+    }
+
+    Bitmap getSettingsBannerBitmap(int w, int h) {
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(out);
+        cv.drawColor(0xFF97999D);
+
+        Bitmap raw = Scenes.loadAssetBitmap(this, "app-logos/settings_banner.png", w, h);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        if (raw != null) {
+            cv.drawBitmap(raw, null, new Rect(0, 0, w, h), p);
+            if (raw != out) raw.recycle();
+        } else {
+            Bitmap gear = Scenes.loadAssetBitmap(this, "app-logos/settings_gear.png", w, h);
+            if (gear != null) {
+                int targetH = Math.round(h * 0.78f);
+                int targetW = targetH;
+                int leftX = (w - targetW) / 2;
+                int topY = (h - targetH) / 2;
+                cv.drawBitmap(gear, null, new Rect(leftX, topY, leftX + targetW, topY + targetH), p);
+                if (gear != out) gear.recycle();
+            }
         }
         return out;
     }
@@ -1102,13 +1128,14 @@ public class MainActivity extends Activity {
 
         boolean isYt = SceneHome.isYouTubePkg(a.pkg, a.key);
         boolean isSftv = SceneHome.isSftvPkg(a.pkg, a.key);
+        boolean isSet = isSettings(a) || SceneHome.isSettingsPkg(a.pkg, a.key);
 
         FrameLayout tile = new FrameLayout(this);
         tile.setFocusable(true);
         tile.setClickable(true);
         tile.setLongClickable(true);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor((isYt || isSftv) ? 0xFFFFFFFF : (a.banner != null ? 0xFF1C1C1E : a.color));
+        bg.setColor(isSet ? 0xFF97999D : ((isYt || isSftv) ? 0xFFFFFFFF : (a.banner != null ? 0xFF1C1C1E : a.color)));
         tile.setBackground(bg);
         applyShapeToTile(tile, bg, getIconShape(this), cardW, cardH);
         tile.setElevation(dp(3));
@@ -1121,6 +1148,10 @@ public class MainActivity extends Activity {
         } else if (isSftv) {
             iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
             iv.setImageBitmap(getSftvBannerBitmap(cardW, cardH));
+            tile.addView(iv, match());
+        } else if (isSet) {
+            iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            iv.setImageBitmap(getSettingsBannerBitmap(cardW, cardH));
             tile.addView(iv, match());
         } else if (a.banner != null) {
             iv.setScaleType(ImageView.ScaleType.CENTER_CROP);

@@ -1122,7 +1122,7 @@ public class MainActivity extends Activity {
     Bitmap getSettingsBannerBitmap(int w, int h) {
         Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(out);
-        cv.drawColor(0xFF97999D);
+        cv.drawColor(0xFF2F2F2F);
 
         Bitmap raw = Scenes.loadAssetBitmap(this, "app-logos/settings_banner.png", w, h);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
@@ -1157,7 +1157,7 @@ public class MainActivity extends Activity {
         tile.setClickable(true);
         tile.setLongClickable(true);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(isSet ? 0xFF97999D : ((isYt || isSftv) ? 0xFFFFFFFF : (a.banner != null ? 0xFF1C1C1E : a.color)));
+        bg.setColor(isSet ? 0xFF2F2F2F : ((isYt || isSftv) ? 0xFFFFFFFF : (a.banner != null ? 0xFF1C1C1E : a.color)));
         tile.setBackground(bg);
         applyShapeToTile(tile, bg, getIconShape(this), cardW, cardH);
         tile.setElevation(dp(3));
@@ -1172,7 +1172,7 @@ public class MainActivity extends Activity {
             iv.setImageBitmap(getSftvBannerBitmap(cardW, cardH));
             tile.addView(iv, match());
         } else if (isSet) {
-            iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
             iv.setImageBitmap(getSettingsBannerBitmap(cardW, cardH));
             tile.addView(iv, match());
         } else if (a.banner != null) {
@@ -1320,7 +1320,7 @@ public class MainActivity extends Activity {
 
     Bitmap makeWallpaper(String style) {
         if (CustomMedia.hasCustomSceneWallpaper(this, 1)) {
-            Bitmap redditWall = CustomMedia.getCustomSceneWallpaper(this, 1, 1920, 1080);
+            Bitmap redditWall = CustomMedia.getCustomSceneWallpaper(this, 1, 3840, 2160);
             if (redditWall != null && !redditWall.isRecycled()) {
                 Bitmap copy = redditWall.copy(Bitmap.Config.ARGB_8888, true);
                 return bakeShade(copy);

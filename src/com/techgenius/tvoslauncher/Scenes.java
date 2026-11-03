@@ -712,7 +712,7 @@ public final class Scenes {
                 ls = new LoadedScene(CUSTOM_SPECS[cSlot - 1]);
                 ls.customTs = ts;
                 ls.ownsBg = false;
-                ls.bg = CustomMedia.getCustomSceneWallpaper(c, cSlot, 1920, 1080);
+                ls.bg = CustomMedia.getCustomSceneWallpaper(c, cSlot, 3840, 2160);
                 if (ls.bg == null) {
                     ls.ownsBg = true;
                     ls.bg = loadAssetBitmap(c, ALL[0].bgAsset, 1920, 1080);

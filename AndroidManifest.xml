@@ -52,6 +52,7 @@
 
     <application
         android:label="tvOS Launcher"
+        android:largeHeap="true"
         android:icon="@drawable/ic_launcher"
         android:banner="@drawable/banner"
         android:theme="@style/HomeTheme"

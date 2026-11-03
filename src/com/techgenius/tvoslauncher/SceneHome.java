@@ -121,17 +121,18 @@ final class SceneHome {
         private final Paint topGleamPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint innerRimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint shadowPaint1 = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint shadowPaint2 = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         private final RectF bounds = new RectF();
-        private final RectF s1 = new RectF(), s2 = new RectF(), lensRect = new RectF();
+        private final RectF lensRect = new RectF();
         private final int[] loc = new int[2];
         private final android.graphics.Matrix m = new android.graphics.Matrix();
         private final android.graphics.Matrix lensMatrix = new android.graphics.Matrix();
 
         private Bitmap shaderFor;
-        private android.graphics.BitmapShader bgShader;
+        private Bitmap frostedBmp;
+        private Bitmap lensBmp;
+        private android.graphics.BitmapShader frostedShader;
+        private android.graphics.BitmapShader lensShader;
         private Bitmap lastColorSampledBmp;
 
         private float dp(float v) { return v * d; }
@@ -140,33 +141,45 @@ final class SceneHome {
             this.radius = radius;
             this.isMac = isMac;
 
-            // Ultra-clear crystalline body tint (no milky/white haze)
             fillPaint.setStyle(Paint.Style.FILL);
-            fillPaint.setColor(isMac ? 0x0EFFFFFF : 0x08FFFFFF);
 
             // Optical lens refraction along the curved bevel
             lensPaint.setStyle(Paint.Style.STROKE);
-            lensPaint.setStrokeWidth(dp(5.5f));
+            lensPaint.setStrokeWidth(dp(6.5f));
 
             // Dynamic rim matching wallpaper colors around the dock
             rimPaint.setStyle(Paint.Style.STROKE);
-            rimPaint.setStrokeWidth(dp(2.4f));
+            rimPaint.setStrokeWidth(dp(1.8f));
 
-            // Delicate hairline glint on top edge (no foggy white shadow)
+            // Delicate specular glint on top-left edge
             topGleamPaint.setStyle(Paint.Style.STROKE);
             topGleamPaint.setStrokeWidth(dp(1.2f));
 
             // Soft inner refraction contour
             innerRimPaint.setStyle(Paint.Style.STROKE);
             innerRimPaint.setStrokeWidth(dp(0.8f));
-            innerRimPaint.setColor(0x28FFFFFF);
+            innerRimPaint.setColor(0x2EFFFFFF);
+        }
 
-            // 3D Soft floating glass drop shadows
-            shadowPaint1.setStyle(Paint.Style.FILL);
-            shadowPaint1.setColor(0x40000000);
-
-            shadowPaint2.setStyle(Paint.Style.FILL);
-            shadowPaint2.setColor(0x20000000);
+        private static Bitmap makeGlassTexture(Bitmap src, int blurRadius, float sat, float scale) {
+            int gw = 360, gh = 202;
+            Bitmap blurred = Ui.blur(src, gw, gh, blurRadius, 2);
+            Bitmap out = Bitmap.createBitmap(gw, gh, Bitmap.Config.ARGB_8888);
+            Canvas cv = new Canvas(out);
+            android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix();
+            cm.setSaturation(sat);
+            android.graphics.ColorMatrix sc = new android.graphics.ColorMatrix(new float[]{
+                scale, 0, 0, 0, 6,
+                0, scale, 0, 0, 6,
+                0, 0, scale, 0, 8,
+                0, 0, 0, 1f, 0
+            });
+            cm.postConcat(sc);
+            Paint p = new Paint(Paint.FILTER_BITMAP_FLAG);
+            p.setColorFilter(new android.graphics.ColorMatrixColorFilter(cm));
+            cv.drawBitmap(blurred, 0, 0, p);
+            if (blurred != src && blurred != out) blurred.recycle();
+            return out;
         }
 
         private int sampleWallpaper(Bitmap bmp, int sx, int sy, int fallback) {
@@ -187,9 +200,9 @@ final class SceneHome {
             int r = Color.red(color);
             int g = Color.green(color);
             int b = Color.blue(color);
-            r = Math.min(255, (int) (r * boost + 35));
-            g = Math.min(255, (int) (g * boost + 35));
-            b = Math.min(255, (int) (b * boost + 35));
+            r = Math.min(255, (int) (r * boost + 42));
+            g = Math.min(255, (int) (g * boost + 42));
+            b = Math.min(255, (int) (b * boost + 42));
             return Color.argb(alpha, r, g, b);
         }
 
@@ -211,23 +224,30 @@ final class SceneHome {
             int rawT = sampleWallpaper(wp, midX, topY, 0xFF455065);
             int rawB = sampleWallpaper(wp, midX, botY, 0xFF202535);
 
-            int cT = glassGlowColor(rawT, 1.4f, 0xE5);
-            int cL = glassGlowColor(rawL, 1.4f, 0xD0);
-            int cR = glassGlowColor(rawR, 1.4f, 0xD0);
-            int cB = glassGlowColor(rawB, 1.3f, 0xB5);
+            int cT = glassGlowColor(rawT, 1.35f, 0xDF);
+            int cL = glassGlowColor(rawL, 1.35f, 0xC8);
+            int cR = glassGlowColor(rawR, 1.35f, 0xC8);
+            int cB = glassGlowColor(rawB, 1.25f, 0xB0);
 
-            // Rim gradient matching surrounding wallpaper colors exactly
+            // Crystalline diagonal sheen across the glass surface
+            fillPaint.setShader(new LinearGradient(
+                    bounds.left, bounds.top, bounds.right, bounds.bottom,
+                    new int[]{0x22FFFFFF, 0x0AFFFFFF, 0x16FFFFFF},
+                    new float[]{0f, 0.52f, 1f},
+                    Shader.TileMode.CLAMP));
+
+            // Rim gradient matching surrounding wallpaper colors + specular corners
             rimPaint.setShader(new LinearGradient(
                     bounds.left, bounds.top, bounds.right, bounds.bottom,
-                    new int[]{cT, cL, 0x30FFFFFF, cR, cB},
+                    new int[]{cT, cL, 0x38FFFFFF, cR, cB},
                     new float[]{0f, 0.22f, 0.50f, 0.78f, 1f},
                     Shader.TileMode.CLAMP));
 
             // Razor-thin top hairline gleam: pure light catching top rim
             topGleamPaint.setShader(new LinearGradient(
-                    bounds.left + w * 0.2f, bounds.top, bounds.right - w * 0.2f, bounds.top,
-                    new int[]{0x00FFFFFF, 0x90FFFFFF, 0x90FFFFFF, 0x00FFFFFF},
-                    new float[]{0f, 0.35f, 0.65f, 1f},
+                    bounds.left + w * 0.12f, bounds.top, bounds.right - w * 0.12f, bounds.top,
+                    new int[]{0x00FFFFFF, 0xA8FFFFFF, 0xA8FFFFFF, 0x00FFFFFF},
+                    new float[]{0f, 0.30f, 0.70f, 1f},
                     Shader.TileMode.CLAMP));
 
             lastColorSampledBmp = wp;
@@ -236,8 +256,6 @@ final class SceneHome {
         @Override
         protected void onBoundsChange(Rect b) {
             bounds.set(b);
-            s1.set(bounds.left + dp(2), bounds.top + dp(4), bounds.right - dp(2), bounds.bottom + dp(9));
-            s2.set(bounds.left + dp(4), bounds.top + dp(8), bounds.right - dp(4), bounds.bottom + dp(18));
             lastColorSampledBmp = null;
         }
 
@@ -247,11 +265,7 @@ final class SceneHome {
             float h = bounds.height();
             float rad = isMac ? Math.min(w, h) * 0.44f : radius;
 
-            // 1. Soft 3D drop shadow (elevates glass above wallpaper)
-            canvas.drawRoundRect(s2, rad, rad, shadowPaint2);
-            canvas.drawRoundRect(s1, rad, rad, shadowPaint1);
-
-            // 2. Optical Magnifying Glass Effect
+            // 1. Optical Frosted + Refractive Liquid Glass Effect (no dark shadow below dock!)
             MainActivity host = MainActivity.activeInstance;
             Bitmap wp = (host != null) ? host.getWallpaperBitmap() : null;
             if (wp != null && !wp.isRecycled()) {
@@ -259,9 +273,12 @@ final class SceneHome {
                 if (cb instanceof View) ((View) cb).getLocationOnScreen(loc);
 
                 if (wp != shaderFor) {
-                    bgShader = new android.graphics.BitmapShader(wp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
-                    magPaint.setShader(bgShader);
-                    lensPaint.setShader(bgShader);
+                    frostedBmp = makeGlassTexture(wp, 5, 1.28f, 1.04f);
+                    lensBmp = makeGlassTexture(wp, 2, 1.36f, 1.08f);
+                    frostedShader = new android.graphics.BitmapShader(frostedBmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                    lensShader = new android.graphics.BitmapShader(lensBmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                    magPaint.setShader(frostedShader);
+                    lensPaint.setShader(lensShader);
                     shaderFor = wp;
                     lastColorSampledBmp = null;
                 }
@@ -273,42 +290,39 @@ final class SceneHome {
                 int sw = host.screenW > 0 ? host.screenW : 1920;
                 int sh = host.screenH > 0 ? host.screenH : 1080;
 
-                // Base matrix maps wallpaper to screen position under the dock
+                // Map frosted glass texture to screen position under the dock with gentle 1.05x refraction
                 m.reset();
-                m.setScale(sw / (float) wp.getWidth(), sh / (float) wp.getHeight());
+                m.setScale(sw / (float) frostedBmp.getWidth(), sh / (float) frostedBmp.getHeight());
                 m.postTranslate(bounds.left - loc[0], bounds.top - loc[1]);
-
-                // MAGNIFYING EFFECT: Zoom in by 1.12x centered on dock bounds!
-                m.postScale(1.12f, 1.12f, bounds.centerX(), bounds.centerY());
-                bgShader.setLocalMatrix(m);
+                m.postScale(1.05f, 1.05f, bounds.centerX(), bounds.centerY());
+                frostedShader.setLocalMatrix(m);
                 canvas.drawRoundRect(bounds, rad, rad, magPaint);
 
-                // Optical lens refraction around outer bevel curve (zoom 1.18x)
+                // Optical lens refraction around curved outer bevel (zoom 1.15x)
                 lensMatrix.set(m);
-                lensMatrix.postScale(1.05f, 1.05f, bounds.centerX(), bounds.centerY());
-                bgShader.setLocalMatrix(lensMatrix);
-                lensPaint.setAlpha(140);
+                lensMatrix.postScale(1.09f, 1.09f, bounds.centerX(), bounds.centerY());
+                lensShader.setLocalMatrix(lensMatrix);
+                lensPaint.setAlpha(175);
                 float lw = lensPaint.getStrokeWidth();
                 lensRect.set(bounds.left + lw / 2f, bounds.top + lw / 2f,
                         bounds.right - lw / 2f, bounds.bottom - lw / 2f);
                 canvas.drawRoundRect(lensRect, rad - lw / 2f, rad - lw / 2f, lensPaint);
-                bgShader.setLocalMatrix(m);
             }
 
-            // 3. Ultra-clear glass body tint
+            // 2. Crystalline diagonal specular surface sheen
             canvas.drawRoundRect(bounds, rad, rad, fillPaint);
 
-            // 4. Dynamic wallpaper-matching chromatic outer rim
+            // 3. Dynamic wallpaper-matching chromatic outer rim
             float in = rimPaint.getStrokeWidth() / 2f;
             canvas.drawRoundRect(bounds.left + in, bounds.top + in, bounds.right - in, bounds.bottom - in,
                     rad - in, rad - in, rimPaint);
 
-            // 5. Razor-thin top rim hairline glint (clean direct light reflection, no white shadow)
+            // 4. Razor-thin top rim hairline glint
             float inTop = topGleamPaint.getStrokeWidth() / 2f;
             canvas.drawRoundRect(bounds.left + inTop, bounds.top + inTop, bounds.right - inTop, bounds.bottom - inTop,
                     rad - inTop, rad - inTop, topGleamPaint);
 
-            // 6. Inner glass refraction contour line
+            // 5. Inner glass refraction contour line
             float in2 = in + dp(1.2f);
             canvas.drawRoundRect(bounds.left + in2, bounds.top + in2, bounds.right - in2, bounds.bottom - in2,
                     Math.max(0, rad - in2), Math.max(0, rad - in2), innerRimPaint);
@@ -382,7 +396,7 @@ final class SceneHome {
         if (raw != null) return raw;
         Bitmap out = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(out);
-        cv.drawColor(0xFF97999D);
+        cv.drawColor(0xFF2F2F2F);
         return out;
     }
 
@@ -1084,7 +1098,7 @@ final class SceneHome {
         boolean isMac = DOCK_LOOK_MACOS.equals(getDockLook(host));
         float rad = isMac ? dp(28) * scale : dp(20) * scale;
         dockBox.setBackground(new AppleLiquidGlass(rad, isMac));
-        dockBox.setElevation(isMac ? dp(14) : dp(8));
+        dockBox.setElevation(0f);
 
         int tileSize = Math.max(dp(26), Math.round(dp(54) * scale));
         int tileGap = Math.max(dp(4), Math.round(dp(10) * scale));
@@ -1210,7 +1224,7 @@ final class SceneHome {
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(rad);
         if (isGear) {
-            bg.setColor(0xFF97999D);
+            bg.setColor(0xFF2F2F2F);
         } else if (isMore) {
             bg.setColor(0x1EFFFFFF);
             bg.setStroke(Math.max(1, dp(0.8f)), 0x24FFFFFF);

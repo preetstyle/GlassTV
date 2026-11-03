@@ -747,10 +747,10 @@ public final class CustomMedia {
     public static boolean setCustomSceneWallpaper(Context c, int slot, Bitmap raw) {
         if (c == null || raw == null) return false;
         int s = Math.max(1, Math.min(5, slot));
-        Bitmap cropped = scaleCenterCropOrFit(raw, 1920, 1080, true);
+        Bitmap cropped = scaleCenterCropOrFit(raw, 3840, 2160, true);
         File f = sceneWallFile(c, s);
         try (FileOutputStream fos = new FileOutputStream(f)) {
-            cropped.compress(Bitmap.CompressFormat.JPEG, 92, fos);
+            cropped.compress(Bitmap.CompressFormat.JPEG, 98, fos);
             fos.flush();
             long ts = System.currentTimeMillis();
             prefs(c).edit().putLong(sceneWallTsKey(s), ts).apply();
@@ -776,7 +776,7 @@ public final class CustomMedia {
         File f = sceneWallFile(c, s);
         if (!f.exists() || f.length() == 0) return null;
         try {
-            Bitmap b = decodeBitmapFromFile(f, Math.max(1280, reqW), Math.max(720, reqH));
+            Bitmap b = decodeBitmapFromFile(f, Math.max(3840, reqW), Math.max(2160, reqH));
             if (b != null) {
                 cachedSceneWalls[s] = b;
                 cachedSceneWallTs[s] = ts;
@@ -795,10 +795,10 @@ public final class CustomMedia {
 
     public static boolean setCustomClassicWallpaper(Context c, Bitmap raw) {
         if (c == null || raw == null) return false;
-        Bitmap cropped = scaleCenterCropOrFit(raw, 1920, 1080, true);
+        Bitmap cropped = scaleCenterCropOrFit(raw, 3840, 2160, true);
         File f = classicWallFile(c);
         try (FileOutputStream fos = new FileOutputStream(f)) {
-            cropped.compress(Bitmap.CompressFormat.JPEG, 92, fos);
+            cropped.compress(Bitmap.CompressFormat.JPEG, 98, fos);
             fos.flush();
             long ts = System.currentTimeMillis();
             prefs(c).edit().putLong(KEY_CLASSIC_WALL_TS, ts).apply();
@@ -824,7 +824,7 @@ public final class CustomMedia {
         File f = classicWallFile(c);
         if (!f.exists() || f.length() == 0) return null;
         try {
-            Bitmap b = decodeBitmapFromFile(f, 1280, 720);
+            Bitmap b = decodeBitmapFromFile(f, 3840, 2160);
             if (b != null) {
                 cachedClassicWall = b;
                 cachedClassicWallTs = ts;

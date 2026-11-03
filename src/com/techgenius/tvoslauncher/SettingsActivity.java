@@ -867,7 +867,7 @@ public class SettingsActivity extends Activity {
 
         // Top Header
         TextView headerTitle = new TextView(this);
-        headerTitle.setText("r/wallpapers (" + items.size() + " " + tr("Wallpapers", "Duvar Kağıdı") + ")");
+        headerTitle.setText("r/wallpapers • 4K UHD (" + items.size() + " " + tr("Wallpapers", "Duvar Kağıdı") + ")");
         headerTitle.setTextColor(Color.WHITE);
         headerTitle.setTypeface(Ui.font(this, "display"));
         Ui.textSize(headerTitle, 22f);
@@ -965,14 +965,14 @@ public class SettingsActivity extends Activity {
         final java.util.concurrent.atomic.AtomicReference<String> currentPreviewUrl =
                 new java.util.concurrent.atomic.AtomicReference<>("");
 
-        // Async Preview Loader
+        // Async Preview Loader (always loads sharp 1080p from full i.redd.it URL)
         java.util.function.Consumer<RedditWallpapers.WallpaperItem> updatePreview = item -> {
             activeItem[0] = item;
-            previewTitle.setText(item.title);
-            String url = item.previewUrl != null && !item.previewUrl.isEmpty() ? item.previewUrl : item.imageUrl;
+            previewTitle.setText(item.title + "  •  " + item.resolutionLabel());
+            String url = item.imageUrl;
             currentPreviewUrl.set(url);
 
-            Bitmap cached = RedditWallpapers.BITMAP_CACHE.get(url + "_1280x720");
+            Bitmap cached = RedditWallpapers.BITMAP_CACHE.get(url + "_1920x1080");
             if (cached != null && !cached.isRecycled()) {
                 activeBitmap[0] = cached;
                 previewSpinner.setVisibility(View.GONE);
@@ -982,7 +982,7 @@ public class SettingsActivity extends Activity {
 
             previewSpinner.setVisibility(View.VISIBLE);
             new Thread(() -> {
-                Bitmap bmp = RedditWallpapers.downloadBitmap(url, 1280, 720);
+                Bitmap bmp = RedditWallpapers.downloadBitmap(url, 1920, 1080);
                 runOnUiThread(() -> {
                     if (url.equals(currentPreviewUrl.get())) {
                         previewSpinner.setVisibility(View.GONE);
@@ -1027,8 +1027,8 @@ public class SettingsActivity extends Activity {
 
             // Load small thumbnail in background
             new Thread(() -> {
-                String thumbUrl = item.previewUrl != null && !item.previewUrl.isEmpty() ? item.previewUrl : item.imageUrl;
-                Bitmap tBmp = RedditWallpapers.downloadBitmap(thumbUrl, 160, 90);
+                String thumbUrl = item.thumbUrl != null && !item.thumbUrl.isEmpty() ? item.thumbUrl : item.imageUrl;
+                Bitmap tBmp = RedditWallpapers.downloadBitmap(thumbUrl, 240, 135);
                 if (tBmp != null) {
                     runOnUiThread(() -> thumbIv.setImageBitmap(tBmp));
                 }
@@ -1094,14 +1094,15 @@ public class SettingsActivity extends Activity {
 
     private void applyWallpaperItem(RedditWallpapers.WallpaperItem item, Bitmap existingBmp, Dialog dialogToDismiss) {
         android.app.ProgressDialog dlProg = new android.app.ProgressDialog(this);
-        dlProg.setMessage(tr("Applying wallpaper…", "Duvar kağıdı uygulanıyor…"));
+        dlProg.setMessage(tr("Applying 4K UHD wallpaper…", "4K UHD duvar kağıdı uygulanıyor…"));
         dlProg.setCancelable(false);
         dlProg.show();
 
         new Thread(() -> {
-            Bitmap bmp = existingBmp;
+            // Always download native 3840x2160 4K image when applying
+            Bitmap bmp = RedditWallpapers.downloadBitmap(item.imageUrl, 3840, 2160);
             if (bmp == null || bmp.isRecycled()) {
-                bmp = RedditWallpapers.downloadBitmap(item.imageUrl, 1920, 1080);
+                bmp = existingBmp;
             }
             final Bitmap finalBmp = bmp;
             runOnUiThread(() -> {
@@ -1115,10 +1116,10 @@ public class SettingsActivity extends Activity {
                     if (dialogToDismiss != null && dialogToDismiss.isShowing()) {
                         dialogToDismiss.dismiss();
                     }
-                    Toast.makeText(this, tr("Wallpaper applied: ", "Duvar kağıdı uygulandı: ") + item.title, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, tr("4K Wallpaper applied: ", "4K Duvar kağıdı uygulandı: ") + item.title, Toast.LENGTH_SHORT).show();
                     rebuildMainRows();
                 } else {
-                    Toast.makeText(this, tr("Failed to download image", "Resim indirilemedi"), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, tr("Failed to download 4K image", "4K Resim indirilemedi"), Toast.LENGTH_SHORT).show();
                 }
             });
         }).start();

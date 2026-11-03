@@ -126,8 +126,8 @@ final class SceneHome {
         private static Bitmap sCachedSourceWp;
         private static int[] sBodyPixels;
         private static int[] sEdgePixels;
-        private static final int SMOOTH_W = 960;
-        private static final int SMOOTH_H = 540;
+        private static final int SMOOTH_W = 1280;
+        private static final int SMOOTH_H = 720;
 
         private Bitmap shaderFor;
         private Bitmap liquifiedBmp;
@@ -151,8 +151,8 @@ final class SceneHome {
 
         private static synchronized void ensureSmoothWallpaper(Bitmap wp) {
             if (wp == sCachedSourceWp && sBodyPixels != null && sEdgePixels != null) return;
-            Bitmap bodyBmp = Ui.blur(wp, SMOOTH_W, SMOOTH_H, 4, 2);
-            Bitmap edgeBmp = Ui.blur(wp, SMOOTH_W, SMOOTH_H, 2, 1);
+            Bitmap bodyBmp = Ui.blur(wp, SMOOTH_W, SMOOTH_H, 2, 1);
+            Bitmap edgeBmp = Ui.blur(wp, SMOOTH_W, SMOOTH_H, 1, 1);
             if (bodyBmp == null || edgeBmp == null) return;
             if (sBodyPixels == null || sBodyPixels.length != SMOOTH_W * SMOOTH_H) {
                 sBodyPixels = new int[SMOOTH_W * SMOOTH_H];
@@ -200,8 +200,8 @@ final class SceneHome {
             int[] edgePx = sEdgePixels;
             if (bodyPx == null || edgePx == null) return null;
 
-            int gw = Math.max(240, Math.min(800, Math.round(w * 0.56f)));
-            int gh = Math.max(108, Math.min(380, Math.round(h * 0.56f)));
+            int gw = Math.max(280, Math.min(1024, Math.round(w * 0.72f)));
+            int gh = Math.max(120, Math.min(480, Math.round(h * 0.72f)));
             int[] outPx = new int[gw * gh];
 
             float cx = w * 0.5f;

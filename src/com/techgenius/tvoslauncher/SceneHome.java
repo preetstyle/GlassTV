@@ -126,8 +126,8 @@ final class SceneHome {
         private static Bitmap sCachedSourceWp;
         private static int[] sBodyPixels;
         private static int[] sEdgePixels;
-        private static final int SMOOTH_W = 1920;
-        private static final int SMOOTH_H = 1080;
+        private static final int SMOOTH_W = 1664;
+        private static final int SMOOTH_H = 936;
 
         private Bitmap shaderFor;
         private Bitmap liquifiedBmp;
@@ -151,8 +151,8 @@ final class SceneHome {
 
         private static synchronized void ensureSmoothWallpaper(Bitmap wp) {
             if (wp == sCachedSourceWp && sBodyPixels != null && sEdgePixels != null) return;
-            Bitmap bodyBmp = Ui.blur(wp, SMOOTH_W, SMOOTH_H, 1, 1);
-            Bitmap edgeBmp = Ui.blur(wp, SMOOTH_W, SMOOTH_H, 1, 0);
+            Bitmap bodyBmp = Ui.blur(wp, SMOOTH_W, SMOOTH_H, 2, 1);
+            Bitmap edgeBmp = Ui.blur(wp, SMOOTH_W, SMOOTH_H, 1, 1);
             if (bodyBmp == null || edgeBmp == null) return;
             if (sBodyPixels == null || sBodyPixels.length != SMOOTH_W * SMOOTH_H) {
                 sBodyPixels = new int[SMOOTH_W * SMOOTH_H];
@@ -200,8 +200,8 @@ final class SceneHome {
             int[] edgePx = sEdgePixels;
             if (bodyPx == null || edgePx == null) return null;
 
-            int gw = Math.max(320, Math.min(1600, Math.round(w * 0.90f)));
-            int gh = Math.max(140, Math.min(480, Math.round(h * 0.90f)));
+            int gw = Math.max(320, Math.min(1600, Math.round(w * 0.82f)));
+            int gh = Math.max(140, Math.min(480, Math.round(h * 0.82f)));
             int[] outPx = new int[gw * gh];
 
             float cx = w * 0.5f;
@@ -276,7 +276,7 @@ final class SceneHome {
                     }
 
                     // Smooth transition from defined meniscus lens at the rim (u=1) to velvety satin blur in the body (u=0)
-                    float edgeWeight = u * (2f - u) * 0.85f;
+                    float edgeWeight = u * (2f - u) * 0.70f;
                     float r = rgbBody[0] * (1f - edgeWeight) + rgbEdge[0] * edgeWeight;
                     float g = rgbBody[1] * (1f - edgeWeight) + rgbEdge[1] * edgeWeight;
                     float b = rgbBody[2] * (1f - edgeWeight) + rgbEdge[2] * edgeWeight;

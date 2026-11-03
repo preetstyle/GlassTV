@@ -665,7 +665,7 @@ public final class I18n {
         sv("Downloading latest APK from GitHub…", "Laddar ner senaste APK från GitHub…");
         sv("Installing update…", "Installerar uppdatering…");
         sv("Update Failed", "Uppdatering misslyckades");
-        sv("Checks GitHub Releases (techgenius1/tvOS-Launcher) for the latest APK and installs updates directly on your TV.", "Söker på GitHub Releases (techgenius1/tvOS-Launcher) efter den senaste APK-filen och installerar uppdateringar direkt på din TV.");
+        sv("Checks GitHub Releases (preetstyle/GlassTV) for the latest APK and installs updates directly on your TV.", "Söker på GitHub Releases (preetstyle/GlassTV) efter den senaste APK-filen och installerar uppdateringar direkt på din TV.");
 
         // Home screen & Quick buttons & Setup
         sv("Keep watching", "Fortsätt titta");

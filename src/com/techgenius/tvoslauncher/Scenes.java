@@ -855,22 +855,24 @@ public final class Scenes {
             // 1. Background image (center-crop)
             drawCenterCrop(canvas, ls.bg, w, h);
 
-            // 2. Scene shade gradient
+            // 2. Scene shade gradient (skip bottom black shade for custom 4K wallpapers so dock glass stays bright)
             Spec sp = ls.spec;
-            if ("water".equals(sp.id)) {
-                shadePaint.setShader(new LinearGradient(0, 0, 0, h,
-                        new int[]{Color.argb(56, 14, 22, 40), Color.argb(15, 14, 22, 40), Color.argb(128, 0, 0, 0)},
-                        new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
-            } else if ("dawn".equals(sp.id)) {
-                shadePaint.setShader(new LinearGradient(0, 0, 0, h,
-                        new int[]{Color.argb(66, 30, 18, 12), Color.argb(20, 30, 18, 12), Color.argb(128, 0, 0, 0)},
-                        new float[]{0f, 0.42f, 1f}, Shader.TileMode.CLAMP));
-            } else {
-                shadePaint.setShader(new LinearGradient(0, 0, 0, h,
-                        new int[]{Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(128, 0, 0, 0)},
-                        new float[]{0f, 0.60f, 1f}, Shader.TileMode.CLAMP));
+            if (customSlotFromId(sp.id) <= 0) {
+                if ("water".equals(sp.id)) {
+                    shadePaint.setShader(new LinearGradient(0, 0, 0, h,
+                            new int[]{Color.argb(56, 14, 22, 40), Color.argb(15, 14, 22, 40), Color.argb(128, 0, 0, 0)},
+                            new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
+                } else if ("dawn".equals(sp.id)) {
+                    shadePaint.setShader(new LinearGradient(0, 0, 0, h,
+                            new int[]{Color.argb(66, 30, 18, 12), Color.argb(20, 30, 18, 12), Color.argb(128, 0, 0, 0)},
+                            new float[]{0f, 0.42f, 1f}, Shader.TileMode.CLAMP));
+                } else {
+                    shadePaint.setShader(new LinearGradient(0, 0, 0, h,
+                            new int[]{Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(128, 0, 0, 0)},
+                            new float[]{0f, 0.60f, 1f}, Shader.TileMode.CLAMP));
+                }
+                canvas.drawRect(0, 0, w, h, shadePaint);
             }
-            canvas.drawRect(0, 0, w, h, shadePaint);
 
             // 3. Giant Glass Clock (iPhone Duo / Rounded / Tall Glass)
             float u = Math.min(w / 960f, h / 540f);

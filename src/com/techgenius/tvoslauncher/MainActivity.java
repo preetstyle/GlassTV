@@ -298,7 +298,7 @@ public class MainActivity extends Activity {
                 });
                 break;
             case SHAPE_SQUIRCLE:
-                float sqRad = minDim * 0.30f;
+                float sqRad = minDim * 0.22f;
                 bg.setCornerRadius(sqRad);
                 tile.setOutlineProvider(new ViewOutlineProvider() {
                     @Override public void getOutline(View v, Outline o) {
@@ -378,6 +378,9 @@ public class MainActivity extends Activity {
         String initLang = getIntent() != null ? getIntent().getStringExtra("lang") : null;
         if (initLang != null && !initLang.isEmpty()) {
             I18n.setLang(this, initLang);
+        }
+        if (getIntent() != null && getIntent().hasExtra("dock_scale")) {
+            Scenes.setDockScalePercent(this, getIntent().getIntExtra("dock_scale", 92));
         }
         focusedIndex = Math.max(0, prefs.getInt("last_classic_idx", 0));
         activeLang = I18n.getLang(this);
@@ -1014,13 +1017,13 @@ public class MainActivity extends Activity {
                 row.setClipChildren(false);
                 row.setClipToPadding(false);
                 if (i == 0 && hasDock()) {
-                    int padH = isMac ? Math.round(dockPadH * 0.85f) : dockPadH;
-                    int padV = isMac ? Math.round(dockPadVScaled * 0.80f) : dockPadVScaled;
+                    int padH = Math.max(dp(20), dockPadH);
+                    int padV = Math.max(dp(18), dockPadVScaled);
                     row.setPadding(padH, padV, padH, padV);
                     LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                     rlp.gravity = Gravity.CENTER_HORIZONTAL;
-                    rlp.bottomMargin = isMac ? dp(26) : dp(10);
+                    rlp.bottomMargin = isMac ? dp(22) : dp(12);
                     row.setBackground(dockBackground());
                     dockRow = row;
                     content.addView(row, rlp);
@@ -1344,12 +1347,8 @@ public class MainActivity extends Activity {
         return bakeShade(makeWallpaperBase(style != null ? style : "aurora"));
     }
 
-    /** The bottom darkening that keeps the dock and labels legible, painted into the image. */
+    /** Keep wallpaper natural and un-darkened so the Liquid Glass dock stays bright and translucent. */
     static Bitmap bakeShade(Bitmap b) {
-        Paint p = new Paint(Paint.DITHER_FLAG);
-        p.setShader(new LinearGradient(0, 0, 0, b.getHeight(), new int[]{0x14000000, 0x40000000, 0xB3000000},
-                null, Shader.TileMode.CLAMP));
-        new Canvas(b).drawRect(0, 0, b.getWidth(), b.getHeight(), p);
         return b;
     }
 
@@ -1609,7 +1608,7 @@ public class MainActivity extends Activity {
     /** Liquid glass dock (Apple): lush rounded corner radius, translucent fill, specular sheen and hairline rim. */
     Drawable dockBackground() {
         boolean isMac = SceneHome.DOCK_LOOK_MACOS.equals(SceneHome.getDockLook(this));
-        float dockRad = isMac ? dp(30) : dp(20);
+        float dockRad = dp(34);
         return new SceneHome.AppleLiquidGlass(dockRad, isMac);
     }
 

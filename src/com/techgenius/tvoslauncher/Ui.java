@@ -73,8 +73,10 @@ public final class Ui {
     static android.graphics.Bitmap blur(android.graphics.Bitmap src, int w, int h, int radius, int passes) {
         if (src == null || src.isRecycled()) return null;
         android.graphics.Bitmap b = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
+        b.setDensity(src.getDensity());
         android.graphics.Canvas c = new android.graphics.Canvas(b);
-        c.drawBitmap(src, null, new android.graphics.Rect(0, 0, w, h),
+        c.drawBitmap(src, new android.graphics.Rect(0, 0, src.getWidth(), src.getHeight()),
+                new android.graphics.Rect(0, 0, w, h),
                 new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG));
         blurInPlace(b, w, h, radius, passes);
         return b;
@@ -84,13 +86,15 @@ public final class Ui {
     static android.graphics.Bitmap glassBackdrop(android.graphics.Bitmap src, int w, int h) {
         if (src == null || src.isRecycled()) return null;
         android.graphics.Bitmap out = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
+        out.setDensity(src.getDensity());
         android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix();
         cm.setSaturation(1.6f);
         cm.postConcat(new android.graphics.ColorMatrix(new float[]{
                 1.05f, 0, 0, 0, 14, 0, 1.05f, 0, 0, 14, 0, 0, 1.05f, 0, 14, 0, 0, 0, 1, 0}));
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
         p.setColorFilter(new android.graphics.ColorMatrixColorFilter(cm));
-        new android.graphics.Canvas(out).drawBitmap(src, null, new android.graphics.Rect(0, 0, w, h), p);
+        new android.graphics.Canvas(out).drawBitmap(src, new android.graphics.Rect(0, 0, src.getWidth(), src.getHeight()),
+                new android.graphics.Rect(0, 0, w, h), p);
         blurInPlace(out, w, h, 3, 3);
         return out;
     }

@@ -116,24 +116,24 @@ final class SceneHome {
         private final float d = android.content.res.Resources.getSystem().getDisplayMetrics().density;
 
         private final Paint magPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-        private final Paint lensPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint topGleamPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint innerRimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         private final RectF bounds = new RectF();
-        private final RectF lensRect = new RectF();
         private final int[] loc = new int[2];
         private final android.graphics.Matrix m = new android.graphics.Matrix();
-        private final android.graphics.Matrix lensMatrix = new android.graphics.Matrix();
+
+        private static Bitmap sCachedSourceWp;
+        private static int[] sBodyPixels;
+        private static int[] sEdgePixels;
+        private static final int SMOOTH_W = 960;
+        private static final int SMOOTH_H = 540;
 
         private Bitmap shaderFor;
-        private Bitmap frostedBmp;
-        private Bitmap lensBmp;
-        private android.graphics.BitmapShader frostedShader;
-        private android.graphics.BitmapShader lensShader;
-        private Bitmap lastColorSampledBmp;
+        private Bitmap liquifiedBmp;
+        private android.graphics.BitmapShader liquifiedShader;
+        private float bakedW, bakedH;
+        private int bakedLocX = Integer.MIN_VALUE, bakedLocY = Integer.MIN_VALUE;
 
         private float dp(float v) { return v * d; }
 
@@ -141,195 +141,254 @@ final class SceneHome {
             this.radius = radius;
             this.isMac = isMac;
 
-            fillPaint.setStyle(Paint.Style.FILL);
-
-            // Optical lens refraction along the curved bevel
-            lensPaint.setStyle(Paint.Style.STROKE);
-            lensPaint.setStrokeWidth(dp(6.5f));
-
-            // Dynamic rim matching wallpaper colors around the dock
             rimPaint.setStyle(Paint.Style.STROKE);
-            rimPaint.setStrokeWidth(dp(1.8f));
+            rimPaint.setStrokeWidth(dp(1.0f));
 
-            // Delicate specular glint on top-left edge
-            topGleamPaint.setStyle(Paint.Style.STROKE);
-            topGleamPaint.setStrokeWidth(dp(1.2f));
-
-            // Soft inner refraction contour
             innerRimPaint.setStyle(Paint.Style.STROKE);
             innerRimPaint.setStrokeWidth(dp(0.8f));
-            innerRimPaint.setColor(0x2EFFFFFF);
+            innerRimPaint.setColor(0x18FFFFFF);
         }
 
-        private static Bitmap makeGlassTexture(Bitmap src, int blurRadius, float sat, float scale) {
-            int gw = 360, gh = 202;
-            Bitmap blurred = Ui.blur(src, gw, gh, blurRadius, 2);
-            Bitmap out = Bitmap.createBitmap(gw, gh, Bitmap.Config.ARGB_8888);
-            Canvas cv = new Canvas(out);
-            android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix();
-            cm.setSaturation(sat);
-            android.graphics.ColorMatrix sc = new android.graphics.ColorMatrix(new float[]{
-                scale, 0, 0, 0, 6,
-                0, scale, 0, 0, 6,
-                0, 0, scale, 0, 8,
-                0, 0, 0, 1f, 0
-            });
-            cm.postConcat(sc);
-            Paint p = new Paint(Paint.FILTER_BITMAP_FLAG);
-            p.setColorFilter(new android.graphics.ColorMatrixColorFilter(cm));
-            cv.drawBitmap(blurred, 0, 0, p);
-            if (blurred != src && blurred != out) blurred.recycle();
-            return out;
-        }
-
-        private int sampleWallpaper(Bitmap bmp, int sx, int sy, int fallback) {
-            if (bmp == null || bmp.isRecycled()) return fallback;
-            MainActivity host = MainActivity.activeInstance;
-            int sw = host != null && host.screenW > 0 ? host.screenW : 1920;
-            int sh = host != null && host.screenH > 0 ? host.screenH : 1080;
-            int bx = Math.max(0, Math.min(bmp.getWidth() - 1, (int) (sx * (bmp.getWidth() / (float) sw))));
-            int by = Math.max(0, Math.min(bmp.getHeight() - 1, (int) (sy * (bmp.getHeight() / (float) sh))));
-            try {
-                return bmp.getPixel(bx, by);
-            } catch (Exception e) {
-                return fallback;
+        private static synchronized void ensureSmoothWallpaper(Bitmap wp) {
+            if (wp == sCachedSourceWp && sBodyPixels != null && sEdgePixels != null) return;
+            Bitmap bodyBmp = Ui.blur(wp, SMOOTH_W, SMOOTH_H, 4, 2);
+            Bitmap edgeBmp = Ui.blur(wp, SMOOTH_W, SMOOTH_H, 2, 1);
+            if (bodyBmp == null || edgeBmp == null) return;
+            if (sBodyPixels == null || sBodyPixels.length != SMOOTH_W * SMOOTH_H) {
+                sBodyPixels = new int[SMOOTH_W * SMOOTH_H];
             }
+            if (sEdgePixels == null || sEdgePixels.length != SMOOTH_W * SMOOTH_H) {
+                sEdgePixels = new int[SMOOTH_W * SMOOTH_H];
+            }
+            bodyBmp.getPixels(sBodyPixels, 0, SMOOTH_W, 0, 0, SMOOTH_W, SMOOTH_H);
+            edgeBmp.getPixels(sEdgePixels, 0, SMOOTH_W, 0, 0, SMOOTH_W, SMOOTH_H);
+            if (bodyBmp != wp) bodyBmp.recycle();
+            if (edgeBmp != wp) edgeBmp.recycle();
+            sCachedSourceWp = wp;
         }
 
-        private int glassGlowColor(int color, float boost, int alpha) {
-            int r = Color.red(color);
-            int g = Color.green(color);
-            int b = Color.blue(color);
-            r = Math.min(255, (int) (r * boost + 42));
-            g = Math.min(255, (int) (g * boost + 42));
-            b = Math.min(255, (int) (b * boost + 42));
-            return Color.argb(alpha, r, g, b);
+        private static void sampleBilinear(int[] px, float fx, float fy, float[] outRgb) {
+            if (fx < 0f) fx = 0f; else if (fx > SMOOTH_W - 1.001f) fx = SMOOTH_W - 1.001f;
+            if (fy < 0f) fy = 0f; else if (fy > SMOOTH_H - 1.001f) fy = SMOOTH_H - 1.001f;
+            int x0 = (int) fx;
+            int y0 = (int) fy;
+            float dx = fx - x0;
+            float dy = fy - y0;
+            int row0 = y0 * SMOOTH_W + x0;
+            int row1 = row0 + SMOOTH_W;
+            int c00 = px[row0];
+            int c10 = px[row0 + 1];
+            int c01 = px[row1];
+            int c11 = px[row1 + 1];
+
+            float w00 = (1f - dx) * (1f - dy);
+            float w10 = dx * (1f - dy);
+            float w01 = (1f - dx) * dy;
+            float w11 = dx * dy;
+
+            outRgb[0] = ((c00 >> 16) & 0xFF) * w00 + ((c10 >> 16) & 0xFF) * w10
+                    + ((c01 >> 16) & 0xFF) * w01 + ((c11 >> 16) & 0xFF) * w11;
+            outRgb[1] = ((c00 >> 8) & 0xFF) * w00 + ((c10 >> 8) & 0xFF) * w10
+                    + ((c01 >> 8) & 0xFF) * w01 + ((c11 >> 8) & 0xFF) * w11;
+            outRgb[2] = (c00 & 0xFF) * w00 + (c10 & 0xFF) * w10
+                    + (c01 & 0xFF) * w01 + (c11 & 0xFF) * w11;
         }
 
-        private void updateDynamicRim(Bitmap wp) {
-            if (wp == null || wp.isRecycled()) return;
-            float w = bounds.width();
-            float h = bounds.height();
-            if (w <= 0 || h <= 0) return;
+        private Bitmap bakeLiquifiedSurface(Bitmap wp, float w, float h, float rad, int screenW, int screenH) {
+            ensureSmoothWallpaper(wp);
+            int[] bodyPx = sBodyPixels;
+            int[] edgePx = sEdgePixels;
+            if (bodyPx == null || edgePx == null) return null;
 
-            int leftX = (int) (loc[0] - dp(18));
-            int rightX = (int) (loc[0] + w + dp(18));
-            int midY = (int) (loc[1] + h * 0.5f);
-            int topY = (int) (loc[1] - dp(16));
-            int botY = (int) (loc[1] + h + dp(16));
-            int midX = (int) (loc[0] + w * 0.5f);
+            int gw = Math.max(240, Math.min(800, Math.round(w * 0.56f)));
+            int gh = Math.max(108, Math.min(380, Math.round(h * 0.56f)));
+            int[] outPx = new int[gw * gh];
 
-            int rawL = sampleWallpaper(wp, leftX, midY, 0xFF354055);
-            int rawR = sampleWallpaper(wp, rightX, midY, 0xFF354055);
-            int rawT = sampleWallpaper(wp, midX, topY, 0xFF455065);
-            int rawB = sampleWallpaper(wp, midX, botY, 0xFF202535);
+            float cx = w * 0.5f;
+            float cy = h * 0.5f;
+            float bx = Math.max(0f, cx - rad);
+            float by = Math.max(0f, cy - rad);
+            // 20dp curved meniscus bevel spanning the visible glass rim around the cards
+            float bevelW = Math.min(Math.min(w, h) * 0.40f, dp(20f));
+            if (bevelW < 1f) bevelW = 1f;
 
-            int cT = glassGlowColor(rawT, 1.35f, 0xDF);
-            int cL = glassGlowColor(rawL, 1.35f, 0xC8);
-            int cR = glassGlowColor(rawR, 1.35f, 0xC8);
-            int cB = glassGlowColor(rawB, 1.25f, 0xB0);
+            float scaleX = SMOOTH_W / (float) Math.max(1, screenW);
+            float scaleY = SMOOTH_H / (float) Math.max(1, screenH);
+            float maxSCurve = dp(6.5f);
+            float[] rgbBody = new float[3];
+            float[] rgbEdge = new float[3];
 
-            // Crystalline diagonal sheen across the glass surface
-            fillPaint.setShader(new LinearGradient(
-                    bounds.left, bounds.top, bounds.right, bounds.bottom,
-                    new int[]{0x22FFFFFF, 0x0AFFFFFF, 0x16FFFFFF},
-                    new float[]{0f, 0.52f, 1f},
-                    Shader.TileMode.CLAMP));
+            for (int gy = 0; gy < gh; gy++) {
+                float y = (gy + 0.5f) * (h / gh);
+                float ry = y - cy;
+                float ay = Math.abs(ry);
+                float qy = ay - by;
+                float oy = qy > 0f ? qy : 0f;
+                int rowOff = gy * gw;
 
-            // Rim gradient matching surrounding wallpaper colors + specular corners
-            rimPaint.setShader(new LinearGradient(
-                    bounds.left, bounds.top, bounds.right, bounds.bottom,
-                    new int[]{cT, cL, 0x38FFFFFF, cR, cB},
-                    new float[]{0f, 0.22f, 0.50f, 0.78f, 1f},
-                    Shader.TileMode.CLAMP));
+                for (int gx = 0; gx < gw; gx++) {
+                    float x = (gx + 0.5f) * (w / gw);
+                    float rx = x - cx;
+                    float ax = Math.abs(rx);
+                    float qx = ax - bx;
+                    float ox = qx > 0f ? qx : 0f;
 
-            // Razor-thin top hairline gleam: pure light catching top rim
-            topGleamPaint.setShader(new LinearGradient(
-                    bounds.left + w * 0.12f, bounds.top, bounds.right - w * 0.12f, bounds.top,
-                    new int[]{0x00FFFFFF, 0xA8FFFFFF, 0xA8FFFFFF, 0x00FFFFFF},
-                    new float[]{0f, 0.30f, 0.70f, 1f},
-                    Shader.TileMode.CLAMP));
+                    float outLen = (float) Math.sqrt(ox * ox + oy * oy);
+                    float insideMax = qx > qy ? qx : qy;
+                    float sdf = outLen + (insideMax < 0f ? insideMax : 0f) - rad;
+                    float distInward = sdf < 0f ? -sdf : 0f;
 
-            lastColorSampledBmp = wp;
+                    float nx = 0f, ny = 0f;
+                    if (outLen > 1e-4f) {
+                        nx = (rx < 0f ? -1f : 1f) * (ox / outLen);
+                        ny = (ry < 0f ? -1f : 1f) * (oy / outLen);
+                    } else if (qx > qy) {
+                        nx = rx < 0f ? -1f : 1f;
+                    } else {
+                        ny = ry < 0f ? -1f : 1f;
+                    }
+
+                    // u = 1.0 at the outer rim (y=0), u = 0.0 at bevelW (20dp inward where cards sit)
+                    float u = 1f - (distInward / bevelW);
+                    if (u < 0f) u = 0f; else if (u > 1f) u = 1f;
+
+                    // 1. Meniscus Border Stretch: at the outer rim (u=1, distInward=0) starts right at the border (loc - 4dp),
+                    //    and stretches the border-touching image across the entire 20dp bevel strip (distInward * 0.92f + sin(u*PI)*10dp)
+                    float borderStretch = (u > 0f)
+                            ? (distInward * 0.90f * (0.4f + 0.6f * u) + (float) Math.sin(u * Math.PI) * dp(9.5f) + dp(4.5f) * u)
+                            : 0f;
+
+                    // 2. Tangential S-Curve Liquid Lens Bend: smooth S-wave across the 20dp bevel
+                    float sWave = (float) -Math.sin(u * 2.0 * Math.PI) * (0.40f + 0.60f * u) * maxSCurve;
+
+                    float sx = loc[0] + x + nx * borderStretch - ny * sWave;
+                    float sy = loc[1] + y + ny * borderStretch + nx * sWave;
+
+                    float fx = sx * scaleX;
+                    float fy = sy * scaleY;
+                    sampleBilinear(bodyPx, fx, fy, rgbBody);
+                    if (u > 0.02f) {
+                        sampleBilinear(edgePx, fx, fy, rgbEdge);
+                    } else {
+                        rgbEdge[0] = rgbBody[0];
+                        rgbEdge[1] = rgbBody[1];
+                        rgbEdge[2] = rgbBody[2];
+                    }
+
+                    // Smooth transition from defined meniscus lens at the rim (u=1) to velvety satin blur in the body (u=0)
+                    float edgeWeight = u * (2f - u) * 0.85f;
+                    float r = rgbBody[0] * (1f - edgeWeight) + rgbEdge[0] * edgeWeight;
+                    float g = rgbBody[1] * (1f - edgeWeight) + rgbEdge[1] * edgeWeight;
+                    float b = rgbBody[2] * (1f - edgeWeight) + rgbEdge[2] * edgeWeight;
+
+                    // Natural 1.08x saturation so skin tones & foliage stay rich and realistic
+                    float satBoost = 1.08f + 0.08f * (u * u);
+                    float lum = 0.299f * r + 0.587f * g + 0.114f * b;
+                    r = lum + (r - lum) * satBoost;
+                    g = lum + (g - lum) * satBoost;
+                    b = lum + (b - lum) * satBoost;
+
+                    // 3-Zone Optical Profile (per close-up reference):
+                    // - Outer 2dp rim (u = 0.86..1.0): warm color-concentrating specular highlight
+                    // - Fresnel trough (u = 0.60..0.86): subtle darker optical depth right below the top rim
+                    // - S-curve lens body (u = 0.0..0.60): calm translucent glass preserving darks & skin tones
+                    float topFactor = Math.max(0f, -0.20f * nx - 0.98f * ny);
+                    float botFactor = Math.max(0f, 0.20f * nx + 0.98f * ny);
+
+                    float rimPeak = u > 0.86f ? (u - 0.86f) / 0.14f : 0f;
+                    rimPeak = rimPeak * rimPeak;
+
+                    float trough = (u > 0.56f && u < 0.88f)
+                            ? (float) Math.sin(((u - 0.56f) / 0.32f) * Math.PI) : 0f;
+
+                    float bodyGloss = (u > 0.06f && u < 0.60f)
+                            ? (float) Math.sin(((u - 0.06f) / 0.54f) * Math.PI) : 0f;
+
+                    float colorExposure = 0.95f
+                            - 0.09f * trough
+                            + 0.09f * bodyGloss * (0.65f * topFactor + 0.35f)
+                            + rimPeak * (0.55f * topFactor + 0.22f * botFactor + 0.12f);
+
+                    float lumGate = 0.18f + 0.82f * Math.min(1f, lum / 180f);
+                    float glassTint = (0.04f
+                            + 0.025f * bodyGloss * topFactor
+                            + rimPeak * (0.22f * topFactor + 0.09f * botFactor + 0.06f)) * lumGate;
+
+                    int ir = Math.max(0, Math.min(255, (int) (r * colorExposure * (1f - glassTint) + 250f * glassTint)));
+                    int ig = Math.max(0, Math.min(255, (int) (g * colorExposure * (1f - glassTint) + 245f * glassTint)));
+                    int ib = Math.max(0, Math.min(255, (int) (b * colorExposure * (1f - glassTint) + 238f * glassTint)));
+
+                    outPx[rowOff + gx] = 0xFF000000 | (ir << 16) | (ig << 8) | ib;
+                }
+            }
+
+            return Bitmap.createBitmap(outPx, gw, gh, Bitmap.Config.ARGB_8888);
         }
 
         @Override
         protected void onBoundsChange(Rect b) {
             bounds.set(b);
-            lastColorSampledBmp = null;
+            rimPaint.setShader(new LinearGradient(
+                    bounds.left, bounds.top, bounds.right, bounds.bottom,
+                    new int[]{0x48FFFFFF, 0x1EFFFFFF, 0x10FFFFFF, 0x18FFFFFF, 0x32FFFFFF},
+                    new float[]{0f, 0.25f, 0.50f, 0.75f, 1f},
+                    Shader.TileMode.CLAMP));
         }
 
         @Override
         public void draw(Canvas canvas) {
             float w = bounds.width();
             float h = bounds.height();
-            float rad = isMac ? Math.min(w, h) * 0.44f : radius;
+            if (w <= 0 || h <= 0) return;
+            // Concentric rounded-rectangle capsule radius (like tvOS 26 dock)
+            float rad = Math.min(radius, Math.min(w, h) * 0.36f);
 
-            // 1. Optical Frosted + Refractive Liquid Glass Effect (no dark shadow below dock!)
             MainActivity host = MainActivity.activeInstance;
             Bitmap wp = (host != null) ? host.getWallpaperBitmap() : null;
             if (wp != null && !wp.isRecycled()) {
                 Object cb = getCallback();
                 if (cb instanceof View) ((View) cb).getLocationOnScreen(loc);
-
-                if (wp != shaderFor) {
-                    frostedBmp = makeGlassTexture(wp, 5, 1.28f, 1.04f);
-                    lensBmp = makeGlassTexture(wp, 2, 1.36f, 1.08f);
-                    frostedShader = new android.graphics.BitmapShader(frostedBmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
-                    lensShader = new android.graphics.BitmapShader(lensBmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
-                    magPaint.setShader(frostedShader);
-                    lensPaint.setShader(lensShader);
-                    shaderFor = wp;
-                    lastColorSampledBmp = null;
-                }
-
-                if (lastColorSampledBmp != wp) {
-                    updateDynamicRim(wp);
-                }
-
                 int sw = host.screenW > 0 ? host.screenW : 1920;
                 int sh = host.screenH > 0 ? host.screenH : 1080;
+                if (loc[0] == 0 && loc[1] == 0 && h < sh * 0.45f) {
+                    loc[0] = Math.round((sw - w) * 0.5f);
+                    loc[1] = host.shelfH > 0 ? host.shelfH : Math.round(sh - h - dp(28));
+                }
 
-                // Map frosted glass texture to screen position under the dock with gentle 1.05x refraction
-                m.reset();
-                m.setScale(sw / (float) frostedBmp.getWidth(), sh / (float) frostedBmp.getHeight());
-                m.postTranslate(bounds.left - loc[0], bounds.top - loc[1]);
-                m.postScale(1.05f, 1.05f, bounds.centerX(), bounds.centerY());
-                frostedShader.setLocalMatrix(m);
-                canvas.drawRoundRect(bounds, rad, rad, magPaint);
+                if (wp != shaderFor || liquifiedBmp == null
+                        || Math.abs(w - bakedW) > 2f || Math.abs(h - bakedH) > 2f
+                        || Math.abs(loc[0] - bakedLocX) > 4 || Math.abs(loc[1] - bakedLocY) > 4) {
+                    Bitmap next = bakeLiquifiedSurface(wp, w, h, rad, sw, sh);
+                    if (next != null) {
+                        liquifiedBmp = next;
+                        liquifiedShader = new android.graphics.BitmapShader(
+                                liquifiedBmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                        magPaint.setShader(liquifiedShader);
+                        shaderFor = wp;
+                        bakedW = w;
+                        bakedH = h;
+                        bakedLocX = loc[0];
+                        bakedLocY = loc[1];
+                    }
+                }
 
-                // Optical lens refraction around curved outer bevel (zoom 1.15x)
-                lensMatrix.set(m);
-                lensMatrix.postScale(1.09f, 1.09f, bounds.centerX(), bounds.centerY());
-                lensShader.setLocalMatrix(lensMatrix);
-                lensPaint.setAlpha(175);
-                float lw = lensPaint.getStrokeWidth();
-                lensRect.set(bounds.left + lw / 2f, bounds.top + lw / 2f,
-                        bounds.right - lw / 2f, bounds.bottom - lw / 2f);
-                canvas.drawRoundRect(lensRect, rad - lw / 2f, rad - lw / 2f, lensPaint);
+                if (liquifiedBmp != null && liquifiedShader != null) {
+                    m.reset();
+                    m.setScale(w / (float) liquifiedBmp.getWidth(), h / (float) liquifiedBmp.getHeight());
+                    m.postTranslate(bounds.left, bounds.top);
+                    liquifiedShader.setLocalMatrix(m);
+                    canvas.drawRoundRect(bounds, rad, rad, magPaint);
+                }
             }
 
-            // 2. Crystalline diagonal specular surface sheen
-            canvas.drawRoundRect(bounds, rad, rad, fillPaint);
-
-            // 3. Dynamic wallpaper-matching chromatic outer rim
+            // Delicate 1dp specular hairline glass rim
             float in = rimPaint.getStrokeWidth() / 2f;
             canvas.drawRoundRect(bounds.left + in, bounds.top + in, bounds.right - in, bounds.bottom - in,
                     rad - in, rad - in, rimPaint);
-
-            // 4. Razor-thin top rim hairline glint
-            float inTop = topGleamPaint.getStrokeWidth() / 2f;
-            canvas.drawRoundRect(bounds.left + inTop, bounds.top + inTop, bounds.right - inTop, bounds.bottom - inTop,
-                    rad - inTop, rad - inTop, topGleamPaint);
-
-            // 5. Inner glass refraction contour line
-            float in2 = in + dp(1.2f);
-            canvas.drawRoundRect(bounds.left + in2, bounds.top + in2, bounds.right - in2, bounds.bottom - in2,
-                    Math.max(0, rad - in2), Math.max(0, rad - in2), innerRimPaint);
         }
 
-        @Override public void setAlpha(int a) { fillPaint.setAlpha(a); }
-        @Override public void setColorFilter(ColorFilter cf) { fillPaint.setColorFilter(cf); }
+        @Override public void setAlpha(int a) { magPaint.setAlpha(a); }
+        @Override public void setColorFilter(ColorFilter cf) { magPaint.setColorFilter(cf); }
         @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
     }
 

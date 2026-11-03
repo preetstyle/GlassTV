@@ -245,8 +245,8 @@ public final class ControlPanelOverlay {
                 });
 
         FrameLayout.LayoutParams plp = (FrameLayout.LayoutParams) panel.getLayoutParams();
-        plp.topMargin = dp(unit, 58);
-        plp.rightMargin = dp(unit, 24);
+        plp.topMargin = dp(unit, 46);
+        plp.rightMargin = dp(unit, 28);
         layer.addView(panel, plp);
 
         WindowManager.LayoutParams wlp = new WindowManager.LayoutParams(
@@ -293,24 +293,30 @@ public final class ControlPanelOverlay {
             Runnable onSettings,
             Runnable onSearch) {
 
-        int col = dp(unit, 141);
-        int gap = dp(unit, 11);
+        int padH = dp(unit, 14);
+        int padV = dp(unit, 14);
+        int col = dp(unit, 140);
+        int gap = dp(unit, 10);
         int cap = dp(unit, 56);
         int small = (2 * col + gap - 3 * gap) / 4;
-        int w = 2 * col + gap;
+        int innerW = 2 * col + gap;
 
         FrameLayout panel = new FrameLayout(c);
         panel.setClipChildren(false);
         panel.setClipToPadding(false);
 
+        // Apple Liquid Glass container matching the home dock!
+        panel.setBackground(new SceneHome.AppleLiquidGlass(dp(unit, 26), false));
+        panel.setElevation(dp(unit, 12));
+
         // Row 0: Wi-Fi | Bluetooth
         int y0 = 0;
-        outCells.add(makeTile(c, panel, 0, y0, col, cap, unit, screenW, screenH, glassSource,
+        outCells.add(makeTile(c, panel, padH + 0, padV + y0, col, cap, unit, screenW, screenH, glassSource,
                 "wifi", "Wi-Fi", () -> wifiState(c), v -> {
                     dismissAll(c);
                     openWifiSettings(c);
                 }));
-        outCells.add(makeTile(c, panel, col + gap, y0, col, cap, unit, screenW, screenH, glassSource,
+        outCells.add(makeTile(c, panel, padH + col + gap, padV + y0, col, cap, unit, screenW, screenH, glassSource,
                 "bluetooth", "Bluetooth", () -> bluetoothState(c), v -> {
                     dismissAll(c);
                     openBluetoothSettings(c);
@@ -318,7 +324,7 @@ public final class ControlPanelOverlay {
 
         // Row 1: Memory | Do Not Disturb
         int y1 = y0 + cap + gap;
-        View memTile = makeTile(c, panel, 0, y1, col, cap, unit, screenW, screenH, glassSource,
+        View memTile = makeTile(c, panel, padH + 0, padV + y1, col, cap, unit, screenW, screenH, glassSource,
                 "memory", I18n.s(c, "Memory", "Bellek"), () -> memoryState(c), v -> {
                     dismissAll(c);
                     RecentAppsOverlay.show(c);
@@ -326,29 +332,29 @@ public final class ControlPanelOverlay {
         attachMemoryBar(c, memTile, unit);
         outCells.add(memTile);
 
-        outCells.add(makeTile(c, panel, col + gap, y1, col, cap, unit, screenW, screenH, glassSource,
+        outCells.add(makeTile(c, panel, padH + col + gap, padV + y1, col, cap, unit, screenW, screenH, glassSource,
                 "moon", I18n.s(c, "Do Not Disturb", "Rahatsız Etmeyin"), () -> dndState(c), v -> toggleDnd(c)));
 
         // Row 2: Audio | Sleep Timer
         int y2 = y1 + cap + gap;
-        outCells.add(makeTile(c, panel, 0, y2, col, cap, unit, screenW, screenH, glassSource,
+        outCells.add(makeTile(c, panel, padH + 0, padV + y2, col, cap, unit, screenW, screenH, glassSource,
                 "audio", I18n.s(c, "Audio", "Ses"), () -> audioState(c), v -> {
                     dismissAll(c);
                     openSoundSettings(c);
                 }));
-        outCells.add(makeTile(c, panel, col + gap, y2, col, cap, unit, screenW, screenH, glassSource,
+        outCells.add(makeTile(c, panel, padH + col + gap, padV + y2, col, cap, unit, screenW, screenH, glassSource,
                 "timer", I18n.s(c, "Sleep Timer", "Uyku Zamanlayıcısı"), () -> timerState(c), v -> cycleSleepTimer(c)));
 
         // Row 3: Ambient Mode | Power Off
         int y3 = y2 + cap + gap;
-        outCells.add(makeTile(c, panel, 0, y3, col, cap, unit, screenW, screenH, glassSource,
+        outCells.add(makeTile(c, panel, padH + 0, padV + y3, col, cap, unit, screenW, screenH, glassSource,
                 "ambient", I18n.s(c, "Ambient Mode", "Ortam Modu"),
                 () -> I18n.s(c, "Screensaver", "Ekran Koruyucu"),
                 v -> {
                     dismissAll(c);
                     startAmbientMode(c);
                 }));
-        outCells.add(makeTile(c, panel, col + gap, y3, col, cap, unit, screenW, screenH, glassSource,
+        outCells.add(makeTile(c, panel, padH + col + gap, padV + y3, col, cap, unit, screenW, screenH, glassSource,
                 "power", I18n.s(c, "Power Off", "Kapat"),
                 () -> I18n.s(c, "Screen Off", "Ekranı Kapat"),
                 v -> {
@@ -364,14 +370,15 @@ public final class ControlPanelOverlay {
         Runnable[] actions = {onInputs, onButtonMapper, onSettings, onSearch};
         for (int i = 0; i < icons.length; i++) {
             final Runnable act = actions[i];
-            outCells.add(makeTile(c, panel, i * (small + gap), y4, small, small, unit, screenW, screenH, glassSource,
+            outCells.add(makeTile(c, panel, padH + i * (small + gap), padV + y4, small, small, unit, screenW, screenH, glassSource,
                     icons[i], null, null, v -> {
                         if (act != null) act.run();
                     }));
         }
 
-        int totalH = y4 + small;
-        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(w, totalH, Gravity.TOP | Gravity.END);
+        int totalH = y4 + small + 2 * padV;
+        int totalW = innerW + 2 * padH;
+        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(totalW, totalH, Gravity.TOP | Gravity.END);
         plp.topMargin = dp(unit, 36);
         plp.rightMargin = dp(unit, 28);
         panel.setLayoutParams(plp);
@@ -397,20 +404,10 @@ public final class ControlPanelOverlay {
         boolean iconOnly = title == null;
         float radius = iconOnly ? dp(unit, 16) : h / 2f;
 
-        final android.graphics.drawable.Drawable idleBg;
-        if (glassSource != null) {
-            MainActivity.LiquidGlass glass = new MainActivity.LiquidGlass(
-                    radius, 0x2EFFFFFF, glassSource, screenW, screenH, unit).adaptive();
-            glass.lens = dp(unit, 7);
-            glass.rimStrength = 0.85f;
-            idleBg = glass;
-        } else {
-            GradientDrawable darkGlass = new GradientDrawable();
-            darkGlass.setCornerRadius(radius);
-            darkGlass.setColor(0xD81E1E26);
-            darkGlass.setStroke(Math.max(1, dp(unit, 1)), 0x33FFFFFF);
-            idleBg = darkGlass;
-        }
+        GradientDrawable idleBg = new GradientDrawable();
+        idleBg.setCornerRadius(radius);
+        idleBg.setColor(0x22FFFFFF); // Translucent glass capsule matching dock
+        idleBg.setStroke(Math.max(1, dp(unit, 1)), 0x38FFFFFF); // Clean glass edge
 
         LinearLayout t = new LinearLayout(c);
         t.setOrientation(LinearLayout.HORIZONTAL);

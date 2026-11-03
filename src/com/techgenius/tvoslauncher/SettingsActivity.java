@@ -17,6 +17,7 @@ import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Shader;
 import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -26,10 +27,12 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.Window;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -106,6 +109,7 @@ public class SettingsActivity extends Activity {
     private boolean rebuilding = false;
     private String liftedSceneId = null;
     private boolean showingHiddenApps = false;
+    private boolean showingAppVisibility = false;
     private String activeSubMenu = null;
     private final List<String> subMenuStack = new ArrayList<>();
     private final List<Integer> subMenuParentFocusIdx = new ArrayList<>();
@@ -245,23 +249,11 @@ public class SettingsActivity extends Activity {
 
     private void buildUi() {
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(0xFF0A080C);
-
-        // Blurred scene backdrop matching couch-tv's Home settings screen
-        ImageView bgView = new ImageView(this);
-        bgView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        Bitmap blurredBg = buildSettingsBackdrop();
-        if (blurredBg != null) {
-            bgView.setImageDrawable(new BitmapDrawable(getResources(), blurredBg));
-        }
-        root.addView(bgView, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        // Dark translucent scrim: rgba(10, 8, 12, 0.80)
-        View scrim = new View(this);
-        scrim.setBackgroundColor(0xCC0A080C);
-        root.addView(scrim, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // Apple TV (tvOS) authentic deep slate matte background
+        GradientDrawable tvosBg = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFF161619, 0xFF121214, 0xFF0E0E10});
+        root.setBackground(tvosBg);
 
         // Two-column grid: left sidebar (276dp) + gap (34dp) + right content (1f)
         LinearLayout columns = new LinearLayout(this);
@@ -383,35 +375,6 @@ public class SettingsActivity extends Activity {
     }
 
     /** Creates the soft blurred scene + dock glow backdrop behind Home settings (matching home-settings.jpg). */
-    private Bitmap buildSettingsBackdrop() {
-        try {
-            List<String> enabled = Scenes.getEnabledSceneIds(this);
-            String sceneId = enabled.isEmpty() ? "night" : enabled.get(0);
-            Scenes.Spec spec = Scenes.byId(sceneId);
-            Bitmap src = Scenes.CUSTOM_ID.equals(sceneId)
-                    ? CustomMedia.getCustomSceneWallpaper(this, 480, 270)
-                    : Scenes.loadAssetBitmap(this, spec.bgAsset, 480, 270);
-            if (src == null) return null;
-            int w = 240, h = 135;
-            Bitmap base = Bitmap.createScaledBitmap(src, w, h, true);
-            if (base != src) src.recycle();
-            Canvas c = new Canvas(base);
-            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-            // Subtle dock-like color dots along the bottom before blurring, as seen in home-settings.jpg
-            int[] dockCols = {0xFFE50914, 0xFF00C2B8, 0xFF0066E5, 0xFF8E3CF7, 0xFF00A8E1, 0xFFF5C518};
-            for (int i = 0; i < dockCols.length; i++) {
-                p.setColor(dockCols[i]);
-                p.setAlpha(110);
-                float cx = w * (0.20f + i * 0.11f);
-                c.drawCircle(cx, h * 0.88f, w * 0.035f, p);
-            }
-            Bitmap blurred = Ui.blur(base, w, h, 8, 3);
-            if (blurred != base) base.recycle();
-            return blurred;
-        } catch (Exception e) {
-            return null;
-        }
-    }
 
     private void buildSidebarRows() {
         sideList.removeAllViews();
@@ -467,8 +430,9 @@ public class SettingsActivity extends Activity {
                 if (has) {
                     inRows = false;
                     liftedSceneId = null;
-                    if (!secKey.equals(currentSection) || showingHiddenApps || activeSubMenu != null) {
+                    if (!secKey.equals(currentSection) || showingHiddenApps || showingAppVisibility || activeSubMenu != null) {
                         showingHiddenApps = false;
+                        showingAppVisibility = false;
                         activeSubMenu = null;
                         subMenuStack.clear();
                         subMenuParentFocusIdx.clear();
@@ -586,9 +550,9 @@ public class SettingsActivity extends Activity {
         } else if (!inRows) {
             hintView.setText(tr("Up and down to browse, OK to change, Back to close",
                     "Gezinmek için Yukarı ve Aşağı, değiştirmek için OK, kapatmak için Geri"));
-        } else if (APPS.equals(currentSection) && showingHiddenApps) {
-            hintView.setText(tr("OK to open  ·  Hold OK to restore  ·  Back to go back",
-                    "Açmak için OK  ·  Geri yüklemek için OK'e basılı tutun  ·  Dönmek için Geri"));
+        } else if (APPS.equals(currentSection) && (showingHiddenApps || showingAppVisibility)) {
+            hintView.setText(tr("OK to toggle or open  ·  Back to go back",
+                    "Değiştirmek veya açmak için OK  ·  Dönmek için Geri"));
         } else if (movableRow) {
             hintView.setText(tr("OK to change, hold OK to move, Back to go back",
                     "Değiştirmek için OK, taşımak için OK'e basılı tutun, dönmek için Geri"));
@@ -631,8 +595,9 @@ public class SettingsActivity extends Activity {
     }
 
     public boolean closeSubMenu() {
-        if (showingHiddenApps) {
+        if (showingHiddenApps || showingAppVisibility) {
             showingHiddenApps = false;
+            showingAppVisibility = false;
             rebuildMainRows();
             focusFirstRow();
             return true;
@@ -857,8 +822,8 @@ public class SettingsActivity extends Activity {
                     Toast.makeText(this, tr("Icons pushed & updated!", "İkonlar güncellendi!"), Toast.LENGTH_SHORT).show();
                 });
 
-        section(tr("REDDIT WALLPAPERS (r/TVWallpapersSFW)", "REDDIT DUVAR KAĞITLARI"));
-        row(tr("Fetch Reddit wallpaper", "Reddit duvar kağıdı getir"),
+        section(tr("REDDIT WALLPAPERS (r/wallpapers)", "REDDIT DUVAR KAĞITLARI"));
+        row(tr("Browse & preview wallpapers", "Duvar kağıtlarına göz at ve uygula"),
                 () -> "›",
                 this::fetchRedditWallpaperListAction);
 
@@ -869,15 +834,15 @@ public class SettingsActivity extends Activity {
 
     private void fetchRedditWallpaperListAction() {
         android.app.ProgressDialog prog = new android.app.ProgressDialog(this);
-        prog.setMessage(tr("Fetching wallpaper list from r/TVWallpapersSFW…", "r/TVWallpapersSFW'den duvar kağıdı listesi alınıyor…"));
-        prog.setCancelable(true);
+        prog.setMessage(tr("Fetching wallpapers from r/wallpapers…", "r/wallpapers'tan duvar kağıtları alınıyor…"));
+        prog.setCancelable(false);
         prog.show();
 
         RedditWallpapers.fetchWallpaperList(this, new RedditWallpapers.ListCallback() {
             @Override
             public void onSuccess(List<RedditWallpapers.WallpaperItem> items) {
                 prog.dismiss();
-                showRedditWallpaperListDialog(items);
+                showRedditWallpaperBrowser(items);
             }
 
             @Override
@@ -888,185 +853,275 @@ public class SettingsActivity extends Activity {
         });
     }
 
-    private void showRedditWallpaperListDialog(List<RedditWallpapers.WallpaperItem> items) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(u(24), u(20), u(24), u(20));
-        root.setBackgroundColor(0xF0181A22);
-
-        TextView title = new TextView(this);
-        title.setText(tr("r/TVWallpapersSFW (" + items.size() + " Wallpapers)", "r/TVWallpapersSFW (" + items.size() + " Duvar Kağıdı)"));
-        title.setTextColor(Color.WHITE);
-        title.setTypeface(Ui.font(this, "bold"));
-        Ui.textSize(title, 16f);
-        title.setPadding(0, 0, 0, u(4));
-        root.addView(title);
-
-        TextView sub = new TextView(this);
-        sub.setText(tr("Select any wallpaper to preview and apply:", "Önizlemek ve uygulamak için bir duvar kağıdı seçin:"));
-        sub.setTextColor(0xAAFFFFFF);
-        Ui.textSize(sub, 12.5f);
-        sub.setPadding(0, 0, 0, u(14));
-        root.addView(sub);
-
-        ScrollView sv = new ScrollView(this);
-        sv.setVerticalScrollBarEnabled(true);
-        LinearLayout list = new LinearLayout(this);
-        list.setOrientation(LinearLayout.VERTICAL);
-
-        AlertDialog listDialog = builder.setView(root).create();
-
-        for (int i = 0; i < items.size(); i++) {
-            final RedditWallpapers.WallpaperItem item = items.get(i);
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setFocusable(true);
-            row.setClickable(true);
-            row.setPadding(u(14), u(10), u(14), u(10));
-
-            GradientDrawable rowBg = new GradientDrawable();
-            rowBg.setColor(0x14FFFFFF);
-            rowBg.setCornerRadius(u(10));
-            row.setBackground(rowBg);
-
-            row.setOnFocusChangeListener((v, hasFocus) -> {
-                if (hasFocus) {
-                    rowBg.setColor(0x44FFFFFF);
-                    row.setScaleX(1.02f);
-                    row.setScaleY(1.02f);
-                } else {
-                    rowBg.setColor(0x14FFFFFF);
-                    row.setScaleX(1.0f);
-                    row.setScaleY(1.0f);
-                }
-            });
-
-            TextView itemText = new TextView(this);
-            itemText.setText((i + 1) + ".  " + item.title);
-            itemText.setTextColor(Color.WHITE);
-            itemText.setSingleLine(true);
-            itemText.setEllipsize(TextUtils.TruncateAt.END);
-            Ui.textSize(itemText, 13.5f);
-            LinearLayout.LayoutParams tLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-            row.addView(itemText, tLp);
-
-            TextView chev = new TextView(this);
-            chev.setText("›");
-            chev.setTextColor(0x88FFFFFF);
-            Ui.textSize(chev, 16f);
-            row.addView(chev);
-
-            LinearLayout.LayoutParams rLp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            rLp.bottomMargin = u(6);
-            list.addView(row, rLp);
-
-            row.setOnClickListener(v -> {
-                android.app.ProgressDialog dlProg = new android.app.ProgressDialog(this);
-                dlProg.setMessage(tr("Downloading wallpaper preview…", "Duvar kağıdı önizlemesi indiriliyor…"));
-                dlProg.setCancelable(true);
-                dlProg.show();
-
-                new Thread(() -> {
-                    Bitmap bmp = RedditWallpapers.downloadBitmap(item.imageUrl);
-                    runOnUiThread(() -> {
-                        dlProg.dismiss();
-                        if (bmp != null) {
-                            showRedditWallpaperPreview(item, bmp, listDialog);
-                        } else {
-                            Toast.makeText(SettingsActivity.this, tr("Failed to download image", "Resim indirilemedi"), Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                }).start();
-            });
+    private void showRedditWallpaperBrowser(List<RedditWallpapers.WallpaperItem> items) {
+        Dialog browserDialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        Window w = browserDialog.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new ColorDrawable(0xFF111215));
         }
 
-        int maxScrollH = u(320);
-        sv.addView(list);
-        root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxScrollH));
-
-        LinearLayout btnRow = new LinearLayout(this);
-        btnRow.setOrientation(LinearLayout.HORIZONTAL);
-        btnRow.setGravity(Gravity.RIGHT);
-        btnRow.setPadding(0, u(12), 0, 0);
-
-        Button closeBtn = createDialogButton(tr("Close", "Kapat"), false, v -> listDialog.dismiss());
-        btnRow.addView(closeBtn);
-        root.addView(btnRow);
-
-        listDialog.show();
-    }
-
-    private void showRedditWallpaperPreview(RedditWallpapers.WallpaperItem item, Bitmap bmp, Dialog parentDialog) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
         LinearLayout root = new LinearLayout(this);
+        root.setBackgroundColor(0xFF111215);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(u(24), u(20), u(24), u(20));
-        root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setBackgroundColor(0xF0181A22);
+        root.setPadding(u(40), u(24), u(40), u(24));
 
-        TextView title = new TextView(this);
-        title.setText(item.title);
-        title.setTextColor(Color.WHITE);
-        title.setTypeface(Ui.font(this, "semibold"));
-        Ui.textSize(title, 15f);
-        title.setGravity(Gravity.CENTER);
-        root.addView(title, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        // Top Header
+        TextView headerTitle = new TextView(this);
+        headerTitle.setText("r/wallpapers (" + items.size() + " " + tr("Wallpapers", "Duvar Kağıdı") + ")");
+        headerTitle.setTextColor(Color.WHITE);
+        headerTitle.setTypeface(Ui.font(this, "display"));
+        Ui.textSize(headerTitle, 22f);
+        root.addView(headerTitle);
 
-        ImageView iv = new ImageView(this);
-        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        iv.setImageBitmap(bmp);
-        int previewW = u(360);
+        TextView headerSub = new TextView(this);
+        headerSub.setText(tr("▲ ▼ Scroll list to live preview • [OK] Apply wallpaper • [BACK] Exit",
+                "▲ ▼ Önizlemek için kaydırın • [OK] Duvar kağıdını uygula • [GERİ] Çıkış"));
+        headerSub.setTextColor(0x99FFFFFF);
+        Ui.textSize(headerSub, 12f);
+        headerSub.setPadding(0, u(3), 0, u(16));
+        root.addView(headerSub);
+
+        // Body: Left list (40%) + Right Live Preview Stage (60%)
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        body.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(body, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        // Left List
+        ScrollView sv = new ScrollView(this);
+        sv.setVerticalScrollBarEnabled(false);
+        sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(u(4), u(4), u(16), u(4));
+        sv.addView(list);
+        body.addView(sv, new LinearLayout.LayoutParams(u(380), ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // Right Preview Stage
+        LinearLayout previewCol = new LinearLayout(this);
+        previewCol.setOrientation(LinearLayout.VERTICAL);
+        previewCol.setGravity(Gravity.CENTER);
+        previewCol.setPadding(u(24), 0, u(8), 0);
+        body.addView(previewCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+
+        // 16:9 Preview Box
+        int previewW = u(520);
         int previewH = Math.round(previewW * 9f / 16f);
-        LinearLayout.LayoutParams ivLp = new LinearLayout.LayoutParams(previewW, previewH);
-        ivLp.topMargin = u(12);
-        ivLp.bottomMargin = u(16);
-        root.addView(iv, ivLp);
+        FrameLayout previewBox = new FrameLayout(this);
+        GradientDrawable previewBoxBg = new GradientDrawable();
+        previewBoxBg.setCornerRadius(u(16));
+        previewBoxBg.setColor(0x1F000000);
+        previewBoxBg.setStroke(Math.max(1, u(1.5f)), 0x33FFFFFF);
+        previewBox.setBackground(previewBoxBg);
+
+        ImageView previewIv = new ImageView(this);
+        previewIv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        previewBox.addView(previewIv, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        ProgressBar previewSpinner = new ProgressBar(this);
+        previewSpinner.setVisibility(View.GONE);
+        FrameLayout.LayoutParams spLp = new FrameLayout.LayoutParams(
+                u(44), u(44), Gravity.CENTER);
+        previewBox.addView(previewSpinner, spLp);
+
+        previewCol.addView(previewBox, new LinearLayout.LayoutParams(previewW, previewH));
+
+        TextView previewTitle = new TextView(this);
+        previewTitle.setTextColor(Color.WHITE);
+        previewTitle.setTypeface(Ui.font(this, "semibold"));
+        Ui.textSize(previewTitle, 15f);
+        previewTitle.setGravity(Gravity.CENTER);
+        previewTitle.setSingleLine(true);
+        previewTitle.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams ptLp = new LinearLayout.LayoutParams(
+                previewW, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ptLp.topMargin = u(14);
+        ptLp.bottomMargin = u(14);
+        previewCol.addView(previewTitle, ptLp);
+
+        final RedditWallpapers.WallpaperItem[] activeItem = new RedditWallpapers.WallpaperItem[]{null};
+        final Bitmap[] activeBitmap = new Bitmap[]{null};
 
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
         btnRow.setGravity(Gravity.CENTER);
 
-        AlertDialog previewDialog = builder.setView(root).create();
-
-        Button applyBtn = createDialogButton(tr("Apply Wallpaper", "Uygula"), true, v -> {
-            CustomMedia.setCustomSceneWallpaper(this, 1, bmp);
-            CustomMedia.setCustomClassicWallpaper(this, bmp);
-            Profiles.homePrefs(this).edit().putString("wallpaper", "custom").apply();
-            RedditWallpapers.setCurrentWallpaperTitle(this, item.title);
-            Scenes.enableCustomScene(this, 1, true);
-            previewDialog.dismiss();
-            if (parentDialog != null && parentDialog.isShowing()) {
-                parentDialog.dismiss();
-            }
-            Toast.makeText(this, tr("Wallpaper applied!", "Duvar kağıdı uygulandı!"), Toast.LENGTH_SHORT).show();
-            rebuildMainRows();
+        Button applyBtn = createDialogButton(tr("Apply Wallpaper", "Duvar Kağıdını Uygula"), true, v -> {
+            RedditWallpapers.WallpaperItem sel = activeItem[0];
+            if (sel == null) return;
+            applyWallpaperItem(sel, activeBitmap[0], browserDialog);
         });
         btnRow.addView(applyBtn);
 
-        Button backBtn = createDialogButton(tr("Back to List", "Listeye Dön"), false, v -> previewDialog.dismiss());
-        LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(
+        Button closeBtn = createDialogButton(tr("Close", "Kapat"), false, v -> browserDialog.dismiss());
+        LinearLayout.LayoutParams cbLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bLp.leftMargin = u(12);
-        btnRow.addView(backBtn, bLp);
+        cbLp.leftMargin = u(12);
+        btnRow.addView(closeBtn, cbLp);
+        previewCol.addView(btnRow);
 
-        Button cancelBtn = createDialogButton(tr("Cancel", "İptal"), false, v -> {
-            previewDialog.dismiss();
-            if (parentDialog != null && parentDialog.isShowing()) {
-                parentDialog.dismiss();
+        final java.util.concurrent.atomic.AtomicReference<String> currentPreviewUrl =
+                new java.util.concurrent.atomic.AtomicReference<>("");
+
+        // Async Preview Loader
+        java.util.function.Consumer<RedditWallpapers.WallpaperItem> updatePreview = item -> {
+            activeItem[0] = item;
+            previewTitle.setText(item.title);
+            String url = item.previewUrl != null && !item.previewUrl.isEmpty() ? item.previewUrl : item.imageUrl;
+            currentPreviewUrl.set(url);
+
+            Bitmap cached = RedditWallpapers.BITMAP_CACHE.get(url + "_1280x720");
+            if (cached != null && !cached.isRecycled()) {
+                activeBitmap[0] = cached;
+                previewSpinner.setVisibility(View.GONE);
+                previewIv.setImageBitmap(cached);
+                return;
             }
-        });
-        LinearLayout.LayoutParams cLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cLp.leftMargin = u(12);
-        btnRow.addView(cancelBtn, cLp);
 
-        root.addView(btnRow);
-        previewDialog.show();
-        applyBtn.requestFocus();
+            previewSpinner.setVisibility(View.VISIBLE);
+            new Thread(() -> {
+                Bitmap bmp = RedditWallpapers.downloadBitmap(url, 1280, 720);
+                runOnUiThread(() -> {
+                    if (url.equals(currentPreviewUrl.get())) {
+                        previewSpinner.setVisibility(View.GONE);
+                        if (bmp != null) {
+                            activeBitmap[0] = bmp;
+                            previewIv.setImageBitmap(bmp);
+                        }
+                    }
+                });
+            }).start();
+        };
+
+        // Populate items in left list
+        View firstRow = null;
+        for (int i = 0; i < items.size(); i++) {
+            final RedditWallpapers.WallpaperItem item = items.get(i);
+            final int index = i;
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setFocusable(true);
+            row.setClickable(true);
+            row.setPadding(u(8), u(6), u(12), u(6));
+
+            GradientDrawable rowBg = new GradientDrawable();
+            rowBg.setColor(0x16FFFFFF);
+            rowBg.setCornerRadius(u(12));
+            row.setBackground(rowBg);
+
+            // Thumbnail
+            ImageView thumbIv = new ImageView(this);
+            thumbIv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            GradientDrawable thumbBg = new GradientDrawable();
+            thumbBg.setColor(0x1AFFFFFF);
+            thumbBg.setCornerRadius(u(8));
+            thumbIv.setBackground(thumbBg);
+            thumbIv.setClipToOutline(true);
+            int thumbW = u(84);
+            int thumbH = Math.round(thumbW * 9f / 16f);
+            row.addView(thumbIv, new LinearLayout.LayoutParams(thumbW, thumbH));
+
+            // Load small thumbnail in background
+            new Thread(() -> {
+                String thumbUrl = item.previewUrl != null && !item.previewUrl.isEmpty() ? item.previewUrl : item.imageUrl;
+                Bitmap tBmp = RedditWallpapers.downloadBitmap(thumbUrl, 160, 90);
+                if (tBmp != null) {
+                    runOnUiThread(() -> thumbIv.setImageBitmap(tBmp));
+                }
+            }).start();
+
+            // Text
+            TextView itemText = new TextView(this);
+            itemText.setText((index + 1) + ".  " + item.title);
+            itemText.setTextColor(0xEEFFFFFF);
+            itemText.setMaxLines(2);
+            itemText.setEllipsize(TextUtils.TruncateAt.END);
+            itemText.setTypeface(Ui.font(this, "medium"));
+            Ui.textSize(itemText, 12.5f);
+            LinearLayout.LayoutParams tLp = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            tLp.leftMargin = u(10);
+            row.addView(itemText, tLp);
+
+            // Row Focus Listener
+            row.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus) {
+                    rowBg.setColor(Color.WHITE);
+                    itemText.setTextColor(0xFF111114);
+                    row.setScaleX(1.03f);
+                    row.setScaleY(1.03f);
+                    updatePreview.accept(item);
+                } else {
+                    rowBg.setColor(0x16FFFFFF);
+                    itemText.setTextColor(0xEEFFFFFF);
+                    row.setScaleX(1.0f);
+                    row.setScaleY(1.0f);
+                }
+            });
+
+            // Click applies directly
+            row.setOnClickListener(v -> applyWallpaperItem(item, activeBitmap[0], browserDialog));
+
+            LinearLayout.LayoutParams rLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rLp.bottomMargin = u(8);
+            list.addView(row, rLp);
+
+            if (i == 0) firstRow = row;
+        }
+
+        browserDialog.setContentView(root, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        browserDialog.show();
+        Window win = browserDialog.getWindow();
+        if (win != null) {
+            win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        }
+
+        if (!items.isEmpty()) {
+            updatePreview.accept(items.get(0));
+        }
+
+        if (firstRow != null) {
+            final View fRow = firstRow;
+            fRow.post(() -> fRow.requestFocus());
+        }
+    }
+
+    private void applyWallpaperItem(RedditWallpapers.WallpaperItem item, Bitmap existingBmp, Dialog dialogToDismiss) {
+        android.app.ProgressDialog dlProg = new android.app.ProgressDialog(this);
+        dlProg.setMessage(tr("Applying wallpaper…", "Duvar kağıdı uygulanıyor…"));
+        dlProg.setCancelable(false);
+        dlProg.show();
+
+        new Thread(() -> {
+            Bitmap bmp = existingBmp;
+            if (bmp == null || bmp.isRecycled()) {
+                bmp = RedditWallpapers.downloadBitmap(item.imageUrl, 1920, 1080);
+            }
+            final Bitmap finalBmp = bmp;
+            runOnUiThread(() -> {
+                dlProg.dismiss();
+                if (finalBmp != null) {
+                    CustomMedia.setCustomSceneWallpaper(this, 1, finalBmp);
+                    CustomMedia.setCustomClassicWallpaper(this, finalBmp);
+                    Profiles.homePrefs(this).edit().putString("wallpaper", "custom").apply();
+                    RedditWallpapers.setCurrentWallpaperTitle(this, item.title);
+                    Scenes.enableCustomScene(this, 1, true);
+                    if (dialogToDismiss != null && dialogToDismiss.isShowing()) {
+                        dialogToDismiss.dismiss();
+                    }
+                    Toast.makeText(this, tr("Wallpaper applied: ", "Duvar kağıdı uygulandı: ") + item.title, Toast.LENGTH_SHORT).show();
+                    rebuildMainRows();
+                } else {
+                    Toast.makeText(this, tr("Failed to download image", "Resim indirilemedi"), Toast.LENGTH_SHORT).show();
+                }
+            });
+        }).start();
     }
 
     private Button createDialogButton(String text, boolean highlight, View.OnClickListener onClick) {
@@ -1095,6 +1150,10 @@ public class SettingsActivity extends Activity {
             pageHiddenApps();
             return;
         }
+        if (showingAppVisibility) {
+            pageAppVisibility();
+            return;
+        }
         row(tr("Lock dock apps", "Dock uygulamalarını kilitle"),
                 () -> MainActivity.isDockLocked(this) ? tr("On", "Açık") : tr("Off", "Kapalı"),
                 () -> {
@@ -1104,6 +1163,13 @@ public class SettingsActivity extends Activity {
                             ? tr("Dock is locked — apps cannot be moved, hidden or uninstalled.",
                                     "Dock kilitlendi — uygulamalar taşınamaz, gizlenemez veya kaldırılamaz.")
                             : tr("Dock unlocked.", "Dock kilidi açıldı."));
+                });
+        row(tr("Manage app visibility (Hide / Show)", "Uygulama görünürlüğü (Gizle / Göster)"),
+                () -> "›",
+                () -> {
+                    showingAppVisibility = true;
+                    rebuildMainRows();
+                    focusFirstRow();
                 });
         row(tr("Hidden apps", "Gizlenen uygulamalar"),
                 () -> {
@@ -1224,6 +1290,154 @@ public class SettingsActivity extends Activity {
             it.launch = launch;
             out.add(it);
         }
+    }
+
+    private List<HiddenAppItem> listAllAppItems() {
+        List<HiddenAppItem> out = new ArrayList<>();
+        try {
+            PackageManager pm = getPackageManager();
+            Set<String> seenPkgs = new HashSet<>();
+            collectAllResolved(pm, Intent.CATEGORY_LEANBACK_LAUNCHER, seenPkgs, true, out);
+            collectAllResolved(pm, Intent.CATEGORY_LAUNCHER, seenPkgs, false, out);
+            Collections.sort(out, (a, b) -> a.label.compareToIgnoreCase(b.label));
+        } catch (Throwable ignored) {
+        }
+        return out;
+    }
+
+    private void collectAllResolved(PackageManager pm, String category,
+                                     Set<String> seenPkgs, boolean leanback, List<HiddenAppItem> out) {
+        Intent q = new Intent(Intent.ACTION_MAIN).addCategory(category);
+        for (ResolveInfo ri : pm.queryIntentActivities(q, 0)) {
+            if (ri == null || ri.activityInfo == null) continue;
+            ActivityInfo ai = ri.activityInfo;
+            if (ai.packageName.equals(getPackageName()) || seenPkgs.contains(ai.packageName)) continue;
+            if (MainActivity.TV_SETTINGS.equals(ai.packageName)) continue;
+            seenPkgs.add(ai.packageName);
+            android.content.ComponentName cn = new android.content.ComponentName(ai.packageName, ai.name);
+            String key = cn.flattenToShortString();
+            HiddenAppItem it = new HiddenAppItem();
+            it.key = key;
+            it.pkg = ai.packageName;
+            String defLabel = ri.loadLabel(pm).toString();
+            it.label = MainActivity.getCustomAppName(this, key, ai.packageName, defLabel);
+            it.icon = ri.loadIcon(pm);
+            Intent launch = new Intent(Intent.ACTION_MAIN)
+                    .setComponent(cn)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            if (leanback) launch.addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+            it.launch = launch;
+            out.add(it);
+        }
+    }
+
+    private void pageAppVisibility() {
+        mainHeadView.setText(tr("Manage app visibility", "Uygulama görünürlüğü"));
+        row("←  " + tr("Back to Apps", "Uygulamalara dön"), () -> "", () -> {
+            showingAppVisibility = false;
+            rebuildMainRows();
+            focusFirstRow();
+        });
+
+        List<HiddenAppItem> allApps = listAllAppItems();
+        Set<String> hidden = Profiles.homePrefs(this).getStringSet(MainActivity.PREF_HIDDEN, Collections.emptySet());
+        for (int i = 0; i < allApps.size(); i++) {
+            final HiddenAppItem item = allApps.get(i);
+            final boolean isHidden = hidden != null && (hidden.contains(item.key) || (item.pkg != null && hidden.contains(item.pkg)));
+            appVisibilityRow(item, isHidden);
+        }
+        infoNote(tr("OK to toggle Visible / Hidden  ·  Back to return",
+                "Görünür / Gizli değiştirmek için OK  ·  Geri dönmek için Geri"));
+    }
+
+    private void appVisibilityRow(final HiddenAppItem item, final boolean isHidden) {
+        LinearLayout r = new LinearLayout(this);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setFocusable(true);
+        r.setClickable(true);
+        r.setPadding(u(14), u(6), u(16), u(6));
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(u(13));
+        bg.setColor(0x14FFFFFF);
+        r.setBackground(bg);
+
+        int icSz = u(28);
+        ImageView iconIv = new ImageView(this);
+        iconIv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        if (item.icon != null) iconIv.setImageDrawable(item.icon);
+        final float icRad = u(6.5f);
+        iconIv.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, Outline o) {
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), icRad);
+            }
+        });
+        iconIv.setClipToOutline(true);
+        LinearLayout.LayoutParams icLp = new LinearLayout.LayoutParams(icSz, icSz);
+        icLp.rightMargin = u(12);
+        r.addView(iconIv, icLp);
+
+        TextView l = new TextView(this);
+        l.setText(item.label);
+        l.setTextColor(0xEBF4F4F6);
+        l.setTypeface(Ui.font(this, "semibold"));
+        Ui.textSize(l, 14.5f);
+        l.setSingleLine(true);
+        l.setEllipsize(TextUtils.TruncateAt.END);
+        r.addView(l, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView v = new TextView(this);
+        v.setText(isHidden ? tr("Hidden", "Gizli") : tr("Visible", "Görünür"));
+        v.setTextColor(isHidden ? 0xFFFF9500 : 0x9EFFFFFF);
+        v.setTypeface(Ui.font(this, "medium"));
+        Ui.textSize(v, 13.5f);
+        v.setSingleLine(true);
+        r.addView(v);
+
+        r.setOnFocusChangeListener((view, has) -> {
+            if (has) {
+                inRows = true;
+                updateSidebarStyles();
+                updateHintText(false);
+            }
+            bg.setColor(has ? Color.WHITE : 0x14FFFFFF);
+            l.setTextColor(has ? 0xFF111114 : 0xEBF4F4F6);
+            v.setTextColor(has ? (isHidden ? 0xFFC96800 : 0x99000000) : (isHidden ? 0xFFFF9500 : 0x9EFFFFFF));
+            view.animate().scaleX(has ? 1.02f : 1f).scaleY(has ? 1.02f : 1f)
+                    .translationZ(has ? u(8) : 0f).setDuration(180).start();
+        });
+
+        r.setOnClickListener(view -> {
+            Set<String> curHidden = new HashSet<>(Profiles.homePrefs(this).getStringSet(MainActivity.PREF_HIDDEN, Collections.emptySet()));
+            Set<String> curOther = new HashSet<>(Profiles.homePrefs(this).getStringSet(MainActivity.PREF_OTHER, Collections.emptySet()));
+            boolean nowHidden;
+            if (curHidden.contains(item.key) || (item.pkg != null && curHidden.contains(item.pkg))) {
+                curHidden.remove(item.key);
+                if (item.pkg != null) curHidden.remove(item.pkg);
+                nowHidden = false;
+            } else {
+                curHidden.add(item.key);
+                if (item.pkg != null) curHidden.add(item.pkg);
+                curOther.remove(item.key);
+                if (item.pkg != null) curOther.remove(item.pkg);
+                nowHidden = true;
+            }
+            Profiles.homePrefs(this).edit()
+                    .putStringSet(MainActivity.PREF_HIDDEN, curHidden)
+                    .putStringSet(MainActivity.PREF_OTHER, curOther)
+                    .apply();
+            showStatusMsg(nowHidden
+                    ? tr(item.label + " is now hidden from Home.", item.label + " Ana Ekran'dan gizlendi.")
+                    : tr(item.label + " is now visible on Home.", item.label + " Ana Ekran'da görünür yapıldı."));
+            rebuildMainRows();
+        });
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, u(42));
+        lp.bottomMargin = u(5);
+        list.addView(r, lp);
     }
 
     private void pageHiddenApps() {

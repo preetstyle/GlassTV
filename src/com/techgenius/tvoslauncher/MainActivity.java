@@ -214,6 +214,9 @@ public class MainActivity extends Activity {
     String lastDockLook;
     String lastIconShape;
     long lastCustomWallTs = -1L;
+    Set<String> lastHiddenSet;
+    Set<String> lastOtherSet;
+    String lastOrderStr;
     final java.util.concurrent.ExecutorService io = java.util.concurrent.Executors.newSingleThreadExecutor();
     final Runnable heroAdvance = () -> {
         if (this.search != null) scheduleAdvance();  // nothing to see under search; keep the slot
@@ -554,6 +557,16 @@ public class MainActivity extends Activity {
         String curIconShape = getIconShape(this);
         long curCustomWallTs = CustomMedia.getCustomClassicWallpaperTs(this);
 
+        Set<String> curHidden = new HashSet<>(prefs.getStringSet(PREF_HIDDEN, Collections.emptySet()));
+        Set<String> curOther = new HashSet<>(prefs.getStringSet(PREF_OTHER, Collections.emptySet()));
+        String curOrder = prefs.getString(PREF_ORDER, "");
+        boolean appsPrefsChanged = (lastHiddenSet != null && !lastHiddenSet.equals(curHidden))
+                || (lastOtherSet != null && !lastOtherSet.equals(curOther))
+                || (lastOrderStr != null && !lastOrderStr.equals(curOrder));
+        lastHiddenSet = curHidden;
+        lastOtherSet = curOther;
+        lastOrderStr = curOrder;
+
         boolean dockOrShapeChanged = (lastDockScale >= 0f && Math.abs(lastDockScale - curDockScale) > 0.001f)
                 || (lastDockLook != null && !lastDockLook.equals(curDockLook))
                 || (lastIconShape != null && !lastIconShape.equals(curIconShape));
@@ -572,7 +585,7 @@ public class MainActivity extends Activity {
         }
         lastCustomWallTs = curCustomWallTs;
 
-        if ((returningFromSettings || dockOrShapeChanged) && !folderMode && launchOverlay == null && moveIndex < 0) {
+        if ((returningFromSettings || dockOrShapeChanged || appsPrefsChanged) && !folderMode && launchOverlay == null && moveIndex < 0) {
             reload(currentKey());
         }
         lastDockScale = curDockScale;
@@ -590,7 +603,7 @@ public class MainActivity extends Activity {
             sceneHome.refreshWhoBar();
             sceneHome.refreshMoonBtn();
             sceneHome.refreshKeepWatching();
-            if (wasReturningFromSettings || dockOrShapeChanged || sceneHome.dockTiles.isEmpty()) {
+            if (wasReturningFromSettings || dockOrShapeChanged || appsPrefsChanged || sceneHome.dockTiles.isEmpty()) {
                 sceneHome.rebuildDock();
             }
             if (pickerLayer == null && menuLayer == null && !sceneHome.isSheetOpen()) {
@@ -1581,6 +1594,10 @@ public class MainActivity extends Activity {
     }
 
     public Bitmap getWallpaperBitmap() {
+        if (Scenes.isScenesLook(this) && sceneHome != null && sceneHome.sceneView != null) {
+            Bitmap scBmp = sceneHome.sceneView.getCurrentBgBitmap();
+            if (scBmp != null && !scBmp.isRecycled()) return scBmp;
+        }
         if (wallView != null && wallView.getDrawable() instanceof BitmapDrawable) {
             Bitmap b = ((BitmapDrawable) wallView.getDrawable()).getBitmap();
             if (b != null && !b.isRecycled()) return b;
@@ -3503,16 +3520,6 @@ public class MainActivity extends Activity {
 
         Set<String> hidden = new HashSet<>(prefs.getStringSet(PREF_HIDDEN, Collections.emptySet()));
         Set<String> other = new HashSet<>(prefs.getStringSet(PREF_OTHER, Collections.emptySet()));
-        boolean cleanedPrefs = false;
-        if (hidden.remove("com.android.vending") || hidden.remove("com.android.vending/com.google.android.finsky.tvmainactivity.TvMainActivity")) {
-            cleanedPrefs = true;
-        }
-        if (other.remove("com.android.vending") || other.remove("com.android.vending/com.google.android.finsky.tvmainactivity.TvMainActivity")) {
-            cleanedPrefs = true;
-        }
-        if (cleanedPrefs) {
-            prefs.edit().putStringSet(PREF_HIDDEN, hidden).putStringSet(PREF_OTHER, other).apply();
-        }
 
         Map<String, AppEntry> pool = new LinkedHashMap<>();
         for (AppEntry e : all.values()) {
@@ -3781,6 +3788,7 @@ public class MainActivity extends Activity {
         Set<String> other = new HashSet<>(prefs.getStringSet(PREF_OTHER, Collections.emptySet()));
         if (hide) {
             hidden.add(a.key);
+            if (a.pkg != null) hidden.add(a.pkg);
             other.remove(a.key);
             if (a.pkg != null) other.remove(a.pkg);
         } else {
@@ -4032,8 +4040,9 @@ public class MainActivity extends Activity {
 
         FrameLayout.LayoutParams plp = (FrameLayout.LayoutParams) panel.getLayoutParams();
         plp.gravity = Gravity.TOP | Gravity.END;
-        plp.topMargin = dp(58);
-        plp.rightMargin = dockOuter;
+        plp.topMargin = dp(46);
+        plp.rightMargin = dp(28);
+        panel.setClickable(true);
         layer.addView(panel, plp);
 
         root.addView(layer, match());

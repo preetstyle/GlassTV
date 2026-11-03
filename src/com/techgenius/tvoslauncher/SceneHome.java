@@ -58,6 +58,7 @@ final class SceneHome {
 
     LinearLayout whoBar;
     LinearLayout moonBtn;
+    android.widget.TextClock pillClock;
     ImageView moonIcon;
     TextView moonText;
 
@@ -79,8 +80,7 @@ final class SceneHome {
     public static final String DOCK_LOOK_TVOS = "tvos";
 
     public static String getDockLook(Context c) {
-        return c.getSharedPreferences("home_prefs", Context.MODE_PRIVATE)
-                .getString("dock_look", DOCK_LOOK_TVOS);
+        return DOCK_LOOK_TVOS;
     }
 
     public static void setDockLook(Context c, String look) {
@@ -583,11 +583,11 @@ final class SceneHome {
         topRightRow.addView(whoBar, wlp);
         refreshWhoBar();
 
-        // Top-right Control Panel Button
+        // Top-right Time + Control Panel Glass Pill
         moonBtn = new LinearLayout(host);
         moonBtn.setOrientation(LinearLayout.HORIZONTAL);
-        moonBtn.setGravity(Gravity.CENTER);
-        int mSize = dp(42);
+        moonBtn.setGravity(Gravity.CENTER_VERTICAL);
+        int mSize = dp(40);
         MainActivity.LiquidGlass moonGlass = new MainActivity.LiquidGlass(
                 mSize / 2f, 0x6614161C, host.glassSource, host.screenW, host.screenH, host.unit);
         moonGlass.lens = dp(5);
@@ -597,9 +597,22 @@ final class SceneHome {
         moonBtn.setClickable(true);
         moonBtn.setLongClickable(true);
 
+        pillClock = new android.widget.TextClock(host);
+        Ui.textSize(pillClock, 13.5f);
+        pillClock.setTypeface(Ui.font(host, "semibold"));
+        pillClock.setTextColor(0xFFF4F4F6);
+        pillClock.setAllCaps(true);
+        String fmt = Scenes.isClock24h(host) ? "HH:mm" : "h:mm a";
+        pillClock.setFormat12Hour(fmt);
+        pillClock.setFormat24Hour(fmt);
+        LinearLayout.LayoutParams pclp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pclp.rightMargin = dp(9);
+        moonBtn.addView(pillClock, pclp);
+
         moonIcon = new ImageView(host);
-        moonIcon.setImageBitmap(Glyphs.get("controls", dp(19), 0xFFF4F4F6));
-        moonBtn.addView(moonIcon, new LinearLayout.LayoutParams(dp(19), dp(19)));
+        moonIcon.setImageBitmap(Glyphs.get("controls", dp(18), 0xFFF4F4F6));
+        moonBtn.addView(moonIcon, new LinearLayout.LayoutParams(dp(18), dp(18)));
 
         moonText = new TextView(host);
         Ui.textSize(moonText, 11f);
@@ -618,7 +631,7 @@ final class SceneHome {
 
         moonBtn.setOnFocusChangeListener((v, has) -> {
             v.setForeground(has ? moonFocusRing : null);
-            v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f)
+            v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f)
                     .setDuration(180).setInterpolator(MainActivity.LIFT).start();
         });
         moonBtn.setOnClickListener(v -> host.showControlCenter());
@@ -648,15 +661,20 @@ final class SceneHome {
 
     void refreshMoonBtn() {
         if (moonBtn == null) return;
+        if (pillClock != null) {
+            String fmt = Scenes.isClock24h(host) ? "HH:mm" : "h:mm a";
+            pillClock.setFormat12Hour(fmt);
+            pillClock.setFormat24Hour(fmt);
+        }
         int left = SleepReceiver.timerLeft(host);
-        int mSize = dp(42);
+        int mSize = dp(40);
         if (left > 0) {
             moonText.setText(left + I18n.s(host, "m", " dk"));
             moonText.setVisibility(View.VISIBLE);
-            moonBtn.setPadding(dp(13), 0, dp(14), 0);
+            moonBtn.setPadding(dp(15), 0, dp(13), 0);
         } else {
             moonText.setVisibility(View.GONE);
-            moonBtn.setPadding(dp(11.5f), 0, dp(11.5f), 0);
+            moonBtn.setPadding(dp(15), 0, dp(12), 0);
         }
         moonBtn.setMinimumWidth(mSize);
     }

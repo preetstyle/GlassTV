@@ -792,14 +792,6 @@ public class SettingsActivity extends Activity {
      */
     void pageLookAndScenes() {
         section(tr("DOCK", "DOCK"));
-        row(tr("Dock style", "Dock görünümü"),
-                () -> SceneHome.DOCK_LOOK_MACOS.equals(SceneHome.getDockLook(this)) ? "macOS" : "tvOS",
-                () -> {
-                    boolean isMac = SceneHome.DOCK_LOOK_MACOS.equals(SceneHome.getDockLook(this));
-                    SceneHome.setDockLook(this, isMac ? SceneHome.DOCK_LOOK_TVOS : SceneHome.DOCK_LOOK_MACOS);
-                    refreshAll();
-                });
-
         row(tr("Dock size", "Dock boyutu"),
                 () -> Scenes.dockScaleLabel(this),
                 () -> {

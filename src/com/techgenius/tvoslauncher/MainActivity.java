@@ -811,17 +811,17 @@ public class MainActivity extends Activity {
 
         // tvOS 26 status row (per Apple's Control Center reference): plain time, then a glass
         // Control Center button and the profile avatar; each turns white/lifts when focused.
-        int btn = dp(34);
+        int btn = dp(38);
         clockBox = new LinearLayout(this);
         clockBox.setOrientation(LinearLayout.HORIZONTAL);
         clockBox.setGravity(Gravity.CENTER_VERTICAL);
         clockBox.setClipChildren(false);
         TextClock time = new TextClock(this);
         statusClock = time;
-        Ui.textSize(time, 16);
-        time.setTypeface(Ui.font(this, "medium"));
-        time.setTextColor(Color.WHITE);
-        time.setShadowLayer(dp(6), 0, dp(1), 0x66000000);
+        Ui.textSize(time, 13.5f);
+        time.setTypeface(Ui.font(this, "semibold"));
+        time.setTextColor(0xFFF4F4F6);
+        time.setShadowLayer(dp(4), 0, dp(1), 0x66000000);
         updateStatusClockFormat();
         time.setAllCaps(true);
         // Internet status, left of the time: white when online, orange when there is no internet.
@@ -837,10 +837,7 @@ public class MainActivity extends Activity {
         chipGlass.lens = dp(4);
         timeChip.setBackground(chipGlass);
         timeChipView = timeChip;
-        time.setShadowLayer(dp(8), 0, dp(1), 0x99000000);
         timeChip.addView(netIcon, nlp);
-        timeChip.addView(time);
-        // Requirement 3: time, refresh, search, avatar removed from status row; only ccButton remains
 
         // Refresh button (removed from top bar per requirement 3)
         refreshButton = new ImageView(this);
@@ -864,25 +861,41 @@ public class MainActivity extends Activity {
         searchButton.setClickable(true);
         searchButton.setOnClickListener(v -> showSearch(null));
 
-        ccButton = new ImageView(this);
-        ccButton.setScaleType(ImageView.ScaleType.CENTER);
-        ccButton.setImageBitmap(Glyphs.get("controls", dp(20), Color.WHITE));
-        LiquidGlass ccGlass = new LiquidGlass(btn / 2f, 0x1F000000, glassSource, screenW, screenH, unit).adaptive();
-        ccGlass.lens = dp(4);
-        ccButton.setBackground(ccGlass);
-        ccButton.setFocusable(true);
-        ccButton.setClickable(true);
-        LinearLayout.LayoutParams cblp = new LinearLayout.LayoutParams(btn, btn);
-        clockBox.addView(ccButton, cblp);
+        LinearLayout ccPill = new LinearLayout(this);
+        ccPill.setOrientation(LinearLayout.HORIZONTAL);
+        ccPill.setGravity(Gravity.CENTER_VERTICAL);
+        ccPill.setPadding(dp(15), 0, dp(12), 0);
+        LiquidGlass ccGlass = new LiquidGlass(btn / 2f, 0x3314161C, glassSource, screenW, screenH, unit).adaptive();
+        ccGlass.lens = dp(5);
+        ccPill.setBackground(ccGlass);
+        ccPill.setFocusable(true);
+        ccPill.setClickable(true);
+
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tlp.rightMargin = dp(9);
+        ccPill.addView(time, tlp);
+
+        ccIcon = new ImageView(this);
+        ccIcon.setScaleType(ImageView.ScaleType.CENTER);
+        ccIcon.setImageBitmap(Glyphs.get("controls", dp(18), 0xFFF4F4F6));
+        ccPill.addView(ccIcon, new LinearLayout.LayoutParams(dp(18), dp(18)));
+
+        ccButton = ccPill;
+        LinearLayout.LayoutParams cblp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, btn);
+        clockBox.addView(ccPill, cblp);
         GradientDrawable ccLit = new GradientDrawable();
-        ccLit.setShape(GradientDrawable.OVAL);
+        ccLit.setCornerRadius(btn / 2f);
         ccLit.setColor(Color.WHITE);
-        ccButton.setOnFocusChangeListener((v, has) -> {
-            ccButton.setBackground(has ? ccLit : ccGlass);
-            ccButton.setImageBitmap(Glyphs.get("controls", dp(20), has ? 0xFF111114 : Color.WHITE));
-            v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(200).setInterpolator(LIFT).start();
+        ccPill.setOnFocusChangeListener((v, has) -> {
+            ccPill.setBackground(has ? ccLit : ccGlass);
+            time.setTextColor(has ? 0xFF111114 : 0xFFF4F4F6);
+            time.setShadowLayer(has ? 0f : dp(4), 0, dp(1), 0x66000000);
+            ccIcon.setImageBitmap(Glyphs.get("controls", dp(18), has ? 0xFF111114 : 0xFFF4F4F6));
+            v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(200).setInterpolator(LIFT).start();
         });
-        ccButton.setOnClickListener(v -> showControlCenter());
+        ccPill.setOnClickListener(v -> showControlCenter());
 
         // Room around the buttons for their focus growth (1.12x / 1.18x) so nothing is clipped;
         // the margins shrink by the same amount, so the row sits exactly where it did.
@@ -2536,8 +2549,8 @@ public class MainActivity extends Activity {
     /** Carousel focused: the dock slides away and the artwork takes the whole screen (tvOS Top Shelf). */
     boolean heroRequested;
 
-    ImageView avatarView, ccButton, refreshButton, searchButton, netIcon;
-    View timeChipView;
+    ImageView avatarView, ccIcon, refreshButton, searchButton, netIcon;
+    View ccButton, timeChipView;
     TextClock statusClock;
 
     void updateStatusClockFormat() {

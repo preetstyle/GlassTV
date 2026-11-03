@@ -43,17 +43,17 @@ javac -encoding UTF-8 --release 11 -classpath "$JAR" \
 if [ -n "${RELEASE_KEYSTORE:-}" ]; then
     [ -n "${RELEASE_KEYSTORE_PASS:-}" ] || { echo "Set RELEASE_KEYSTORE_PASS for $RELEASE_KEYSTORE" >&2; exit 1; }
     "$BT/apksigner" sign --ks "$RELEASE_KEYSTORE" --ks-pass env:RELEASE_KEYSTORE_PASS \
-        --ks-key-alias "${RELEASE_KEY_ALIAS:-tvos-release}" --out build/tvos-home.apk build/aligned.apk
+        --ks-key-alias "${RELEASE_KEY_ALIAS:-tvos-release}" --out build/GlassTV.apk build/aligned.apk
     echo "Signed with the release key"
 else
     KS=debug.keystore
     if [ ! -f "$KS" ]; then
         keytool -genkeypair -keystore "$KS" -storepass android -keypass android -alias debug \
-            -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=tvOS Launcher debug" >/dev/null
+            -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=GlassTV debug" >/dev/null
     fi
     "$BT/apksigner" sign --ks "$KS" --ks-pass pass:android --key-pass pass:android \
-        --out build/tvos-home.apk build/aligned.apk
+        --out build/GlassTV.apk build/aligned.apk
     echo "Signed with the local debug key (development build)"
 fi
 
-echo "Built build/tvos-home.apk"
+echo "Built build/GlassTV.apk"

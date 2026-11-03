@@ -69,11 +69,11 @@ if ($LASTEXITCODE -ne 0) { throw "zipalign failed" }
 $KS = "debug.keystore"
 if (-not (Test-Path $KS)) {
     & keytool -genkeypair -keystore $KS -storepass android -keypass android -alias debug `
-        -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=tvOS Launcher debug" | Out-Null
+        -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=GlassTV debug" | Out-Null
 }
 
 & "$BT\apksigner.bat" sign --ks $KS --ks-pass pass:android --key-pass pass:android `
-    --out build\tvos-home.apk build\aligned.apk
+    --out build\GlassTV.apk build\aligned.apk
 if ($LASTEXITCODE -ne 0) { throw "apksigner failed" }
 
-Write-Host "Built build\tvos-home.apk"
+Write-Host "Built build\GlassTV.apk"

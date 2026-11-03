@@ -236,8 +236,8 @@ public final class AppUpdater {
                 new AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                         .setTitle(I18n.s(activity, "Update Available", "Güncelleme Mevcut") + " (v" + latestVersion + ")")
                         .setMessage(I18n.s(activity,
-                                "A new version of tvOS Launcher (v" + latestVersion + ") is available on GitHub.\nCurrent version: v" + cur,
-                                "GitHub'da yeni bir tvOS Launcher sürümü (v" + latestVersion + ") mevcut.\nMevcut sürüm: v" + cur))
+                                "A new version of GlassTV (v" + latestVersion + ") is available on GitHub.\nCurrent version: v" + cur,
+                                "GitHub'da yeni bir GlassTV sürümü (v" + latestVersion + ") mevcut.\nMevcut sürüm: v" + cur))
                         .setPositiveButton(I18n.s(activity, "Update Now", "Şimdi Güncelle"), (d, w) -> {
                             downloadAndInstall(activity, downloadUrl, latestVersion, false, onUiRefresh);
                         })
@@ -375,8 +375,8 @@ public final class AppUpdater {
         try {
             if (Build.VERSION.SDK_INT >= 26 && !activity.getPackageManager().canRequestPackageInstalls()) {
                 Toast.makeText(activity,
-                        I18n.s(activity, "Please allow 'Install unknown apps' for tvOS Launcher.",
-                                "Lütfen tvOS Launcher için 'Bilinmeyen uygulamaları yükle' iznini verin."),
+                        I18n.s(activity, "Please allow 'Install unknown apps' for GlassTV.",
+                                "Lütfen GlassTV için 'Bilinmeyen uygulamaları yükle' iznini verin."),
                         Toast.LENGTH_LONG).show();
                 try {
                     Intent permIntent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,

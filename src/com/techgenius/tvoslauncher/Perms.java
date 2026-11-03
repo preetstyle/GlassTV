@@ -128,8 +128,8 @@ final class Perms {
             new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                     .setTitle(I18n.s(a, "Turn on Power Off", "Kapatma \u00d6zelli\u011fini A\u00e7\u0131n"))
                     .setMessage(I18n.s(a,
-                            "In the next screen, choose \u201ctvOS Launcher \u2013 Button Mapper & Control Panel\u201d and turn it on.",
-                            "Sonraki ekranda \u201ctvOS Launcher \u2013 Button Mapper & Control Panel\u201d se\u00e7ene\u011fini se\u00e7ip a\u00e7\u0131n."))
+                            "In the next screen, choose \u201cGlassTV \u2013 Button Mapper & Control Panel\u201d and turn it on.",
+                            "Sonraki ekranda \u201cGlassTV \u2013 Button Mapper & Control Panel\u201d se\u00e7ene\u011fini se\u00e7ip a\u00e7\u0131n."))
                     .setPositiveButton(I18n.s(a, "Open Accessibility", "Eri\u015filebilirli\u011fi A\u00e7"), (d, w) -> tryStart(a, acc))
                     .setNegativeButton(I18n.s(a, "Cancel", "\u0130ptal"), null).show();
             return;
@@ -138,8 +138,8 @@ final class Perms {
                 .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin(a))
                 .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
                         I18n.s(a,
-                                "Lets tvOS Launcher turn the screen off for Power Off and the Sleep Timer. It can't do anything else.",
-                                "tvOS Launcher'\u0131n Kapatma ve Uyku Zamanlay\u0131c\u0131s\u0131 i\u00e7in ekran\u0131 kapatmas\u0131n\u0131 sa\u011flar. Ba\u015fka hi\u00e7bir i\u015flem yapamaz."));
+                                "Lets GlassTV turn the screen off for Power Off and the Sleep Timer. It can't do anything else.",
+                                "GlassTV'nin Kapatma ve Uyku Zamanlay\u0131c\u0131s\u0131 i\u00e7in ekran\u0131 kapatmas\u0131n\u0131 sa\u011flar. Ba\u015fka hi\u00e7bir i\u015flem yapamaz."));
         if (tryStart(a, i)) return;
         lastResort(a, I18n.s(a, "Power Off & Sleep Timer", "Kapatma ve Uyku Zamanlay\u0131c\u0131s\u0131"),
                 "adb shell dpm set-active-admin com.techgenius.tvoslauncher/.SleepReceiver\\$Admin");

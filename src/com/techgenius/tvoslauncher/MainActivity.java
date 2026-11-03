@@ -638,8 +638,8 @@ public class MainActivity extends Activity {
         if (SetupActivity.done(this) && !Perms.isDefaultHome(this) && !prefs.getBoolean("asked_default_home", false)) {
             prefs.edit().putBoolean("asked_default_home", true).apply();
             new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                    .setTitle(I18n.s(this, "Make tvOS Launcher your home screen?", "tvOS Launcher ana ekranınız yapılsın mı?"))
-                    .setMessage(I18n.s(this, "The Home button on the remote will open tvOS Launcher.", "Kumandadaki Ana Ekran düğmesi tvOS Launcher'ı açacaktır."))
+                    .setTitle(I18n.s(this, "Make GlassTV your home screen?", "GlassTV ana ekranınız yapılsın mı?"))
+                    .setMessage(I18n.s(this, "The Home button on the remote will open GlassTV.", "Kumandadaki Ana Ekran düğmesi GlassTV'yi açacaktır."))
                     .setPositiveButton(I18n.s(this, "Make Home Screen", "Ana Ekran Yap"), (d, w) -> Perms.requestDefaultHome(this))
                     .setNegativeButton(I18n.s(this, "Not Now", "Şimdi Değil"), null).show();
         }

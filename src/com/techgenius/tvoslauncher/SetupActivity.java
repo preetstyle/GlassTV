@@ -389,7 +389,7 @@ public class SetupActivity extends Activity {
             handler.postDelayed(cycle[0], 2200);
         };
         handler.postDelayed(cycle[0], 2400);
-        TextView s = subtitle(tr("Let\u2019s set up tvOS Launcher.", "tvOS Launcher\u2019\u0131 kural\u0131m."));
+        TextView s = subtitle(tr("Let\u2019s set up GlassTV.", "GlassTV\u2019yi kural\u0131m."));
         Ui.textSize(s, 16);
         ((LinearLayout.LayoutParams) s.getLayoutParams()).bottomMargin = u(16);
         LinearLayout l = scrollableList();
@@ -898,13 +898,13 @@ public class SetupActivity extends Activity {
             handler.postDelayed(() -> Perms.requestLocation(this), 600);
         }
         title(tr("Finish Setting Up", "Kurulumu Tamamla"));
-        TextView s = subtitle(tr("tvOS Launcher works best as the home screen. Allow these once; anything this TV doesn't support is skipped.",
-                "tvOS Launcher en iyi ana ekran olarak \u00e7al\u0131\u015f\u0131r. Bunlara bir kez izin verin; bu TV'nin desteklemedi\u011fi \u00f6zellikler atlan\u0131r."));
+        TextView s = subtitle(tr("GlassTV works best as the home screen. Allow these once; anything this TV doesn't support is skipped.",
+                "GlassTV en iyi ana ekran olarak \u00e7al\u0131\u015f\u0131r. Bunlara bir kez izin verin; bu TV'nin desteklemedi\u011fi \u00f6zellikler atlan\u0131r."));
         ((LinearLayout.LayoutParams) s.getLayoutParams()).bottomMargin = u(16);
         LinearLayout l = scrollableList();
         boolean home = Perms.isDefaultHome(this);
-        option(l, tr("Make tvOS Launcher the Home Screen", "tvOS Launcher'\u0131 Ana Ekran Yap"),
-                home ? tr("The Home button opens tvOS Launcher", "Ana Ekran d\u00fc\u011fmesi tvOS Launcher'\u0131 a\u00e7ar") : tr("Choose tvOS Launcher when asked", "Soruldu\u011funda tvOS Launcher'\u0131 se\u00e7in"), home,
+        option(l, tr("Make GlassTV the Home Screen", "GlassTV'yi Ana Ekran Yap"),
+                home ? tr("The Home button opens GlassTV", "Ana Ekran d\u00fc\u011fmesi GlassTV'yi a\u00e7ar") : tr("Choose GlassTV when asked", "Soruldu\u011funda GlassTV'yi se\u00e7in"), home,
                 () -> Perms.requestDefaultHome(this));
         if (!Perms.hasLocation(this)) {
             option(l, tr("Show the Wi-Fi Name", "Wi-Fi Ad\u0131n\u0131 G\u00f6ster"),
@@ -917,7 +917,7 @@ public class SetupActivity extends Activity {
         }
         if (Perms.adminSupported(this) && !Perms.hasAdmin(this)) {
             option(l, tr("Power Off & Sleep Timer", "Kapatma ve Uyku Zamanlay\u0131c\u0131s\u0131"),
-                    tr("Let tvOS Launcher turn the screen off", "tvOS Launcher'\u0131n ekran\u0131 kapatmas\u0131na izin ver"), false, () -> Perms.requestAdmin(this));
+                    tr("Let GlassTV turn the screen off", "GlassTV'nin ekran\u0131 kapatmas\u0131na izin ver"), false, () -> Perms.requestAdmin(this));
         }
         boolean accOn = ButtonMapper.isServiceEnabled(this);
         option(l, tr("Button Mapper & Control Panel", "D\u00fc\u011fme E\u015fleyici ve Denetim Paneli"),

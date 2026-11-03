@@ -1697,7 +1697,7 @@ public class SettingsActivity extends Activity {
                             .setNegativeButton(tr("Cancel", "İptal"), null)
                             .show();
                 });
-        row(tr("Fix Home button (Launch tvOS Launcher)", "Ana Ekran tuşu düzeltmesi (tvOS Launcher'ı aç)"),
+        row(tr("Fix Home button (Launch GlassTV)", "Ana Ekran tuşu düzeltmesi (GlassTV'yi aç)"),
                 () -> ButtonMapper.isHomeFixEnabled(this) ? tr("On", "Açık") : tr("Off", "Kapalı"),
                 () -> {
                     boolean next = !ButtonMapper.isHomeFixEnabled(this);
@@ -1708,8 +1708,8 @@ public class SettingsActivity extends Activity {
                                 "Ana Ekran tuşu düzeltmesi açıldı — çalışması için yukarıdan Erişilebilirlik servisini de etkinleştirin."));
                     } else {
                         showStatusMsg(next
-                                ? tr("Home button fix enabled — pressing Home will launch tvOS Launcher.",
-                                     "Ana Ekran tuşu düzeltmesi etkinleştirildi — Ana Ekran tuşu tvOS Launcher'ı açacak.")
+                                ? tr("Home button fix enabled — pressing Home will launch GlassTV.",
+                                     "Ana Ekran tuşu düzeltmesi etkinleştirildi — Ana Ekran tuşu GlassTV'yi açacak.")
                                 : tr("Home button fix disabled.",
                                      "Ana Ekran tuşu düzeltmesi kapatıldı."));
                     }
@@ -1824,8 +1824,8 @@ public class SettingsActivity extends Activity {
                     com.techgenius.tvoslauncher.present.BootReceiver.setLaunchOnBootEnabled(this, next);
                     refreshAll();
                     showStatusMsg(next
-                            ? tr("tvOS Launcher will launch automatically after system boot.",
-                                 "tvOS Launcher sistem açılışından hemen sonra otomatik başlatılacak.")
+                            ? tr("GlassTV will launch automatically after system boot.",
+                                 "GlassTV sistem açılışından hemen sonra otomatik başlatılacak.")
                             : tr("Automatic launch on boot disabled.",
                                  "Sistem açılışında otomatik başlatma kapatıldı."));
                 });
@@ -1844,8 +1844,8 @@ public class SettingsActivity extends Activity {
                             : tr("Keep Alive disabled.", "Keep Alive devre dışı bırakıldı."));
                 });
 
-        infoNote(tr("Some TVs disable Accessibility or other permissions automatically in the background. When Keep Alive is on, tvOS Launcher lightly checks permission status in the background without extra RAM or CPU load and automatically restores any disabled permissions via ADB.",
-                "Bazı TV'ler Erişilebilirlik veya diğer izinleri arka planda kendiliğinden kapatabilir. Keep Alive açıkken tvOS Launcher, ekstra RAM veya işlemci yükü oluşturmadan izin durumunu arka planda hafifçe kontrol eder ve kapanan izinleri ADB üzerinden otomatik olarak yeniden açar."));
+        infoNote(tr("Some TVs disable Accessibility or other permissions automatically in the background. When Keep Alive is on, GlassTV lightly checks permission status in the background without extra RAM or CPU load and automatically restores any disabled permissions via ADB.",
+                "Bazı TV'ler Erişilebilirlik veya diğer izinleri arka planda kendiliğinden kapatabilir. Keep Alive açıkken GlassTV, ekstra RAM veya işlemci yükü oluşturmadan izin durumunu arka planda hafifçe kontrol eder ve kapanan izinleri ADB üzerinden otomatik olarak yeniden açar."));
 
         section(tr("CLEANYOURTV (BETA)", "CLEANYOURTV (BETA)"));
         twoLineRow(tr("Choose TV model", "TV modelini seçin"),
@@ -1942,7 +1942,7 @@ public class SettingsActivity extends Activity {
 
     void pageAbout() {
         section(tr("APPLICATION", "UYGULAMA"));
-        infoRow(tr("Home screen", "Ana ekran"), "tvOS Launcher", null);
+        infoRow(tr("Home screen", "Ana ekran"), "GlassTV", null);
         infoRow(tr("Developer", "Geliştirici"), "techgenius", null);
         infoRow(tr("Version", "Sürüm"), version(), null);
         infoRow(tr("Settings kept", "Ayarların saklandığı yer"), tr("On this TV", "Bu TV'de"), null);
@@ -2053,7 +2053,7 @@ public class SettingsActivity extends Activity {
     private void confirmRevokeAllPermissions() {
         dialog(tr("Remove / Revoke All Permissions", "Tüm İzinleri Kaldır / Geri Al"))
                 .setMessage(tr(
-                        "This will disable Keep Alive and remove Device Admin, Accessibility Service, Notification Access, Default Home Role, and runtime permissions (both locally and via ADB).\n\nUse this if your TV does not have a Device Admin settings screen and you want to uninstall tvOS Launcher.",
+                        "This will disable Keep Alive and remove Device Admin, Accessibility Service, Notification Access, Default Home Role, and runtime permissions (both locally and via ADB).\n\nUse this if your TV does not have a Device Admin settings screen and you want to uninstall GlassTV.",
                         "Bu işlem Keep Alive'ı kapatır ve Cihaz Yöneticisi, Erişilebilirlik Servisi, Bildirim Erişimi, Varsayılan Ana Ekran ve tüm çalışma zamanı izinlerini (hem yerel olarak hem ADB üzerinden) kaldırır.\n\nTV'nizde Cihaz Yöneticisi ayar ekranı yoksa ve uygulamayı kaldırmak istiyorsanız bu seçeneği kullanın."))
                 .setPositiveButton(tr("Revoke All Permissions", "Tüm İzinleri Kaldır"), (d, w) -> {
                     AlertDialog progress = dialog(tr("Revoking Permissions…", "İzinler Kaldırılıyor…"))
@@ -2520,7 +2520,7 @@ public class SettingsActivity extends Activity {
         backSubMenuRow();
         section(tr("DEFAULT LAUNCHER SETUP (TCL / PHILIPS / GOOGLE TV)", "VARSAYILAN BAŞLATICI KURULUMU (TCL / PHILIPS / GOOGLE TV)"));
 
-        twoLineRow(tr("1. Set tvOS Launcher as Default via Local ADB", "1. Yerel ADB ile tvOS Launcher'ı Varsayılan Yap"),
+        twoLineRow(tr("1. Set GlassTV as Default via Local ADB", "1. Yerel ADB ile GlassTV'yi Varsayılan Yap"),
                 () -> Perms.isDefaultHome(this) ? tr("Active", "Etkin") : tr("Run ROLE_HOME & set-home-activity ›", "ROLE_HOME ve set-home-activity çalıştır ›"),
                 () -> {
                     AlertDialog progress = dialog(tr("Setting Default Launcher…", "Varsayılan Başlatıcı Ayarlanıyor…"))
@@ -2546,7 +2546,7 @@ public class SettingsActivity extends Activity {
 
         twoLineRow(tr("3. Fix Home Button via Accessibility (Button Mapper)", "3. Erişilebilirlik ile Ana Ekran Tuşu Düzeltmesi"),
                 () -> ButtonMapper.isHomeFixEnabled(this)
-                        ? tr("On — Pressing Home launches tvOS Launcher", "Açık — Ana Ekran tuşu tvOS Launcher'ı açar")
+                        ? tr("On — Pressing Home launches GlassTV", "Açık — Ana Ekran tuşu GlassTV'yi açar")
                         : tr("Off — Tap to enable Home button remap", "Kapalı — Ana Ekran tuşu yönlendirmesini açmak için dokunun"),
                 () -> {
                     boolean next = !ButtonMapper.isHomeFixEnabled(this);
@@ -2561,8 +2561,8 @@ public class SettingsActivity extends Activity {
                 () -> tr("Open system selector (if supported by TV) ›", "Sistem seçicisini aç (TV destekliyorsa) ›"),
                 () -> Perms.openSystemHomeSettingsUi(this));
 
-        infoNote(tr("On TCL and Philips Android 11/12 TVs, the OEM firmware often hides the Android Default Home UI and forces the stock launcher when pressing Home. Disabling the stock launcher (Option 2) or enabling the Home Button Fix (Option 3) guarantees pressing Home always opens tvOS Launcher.",
-                "TCL ve Philips Android 11/12 TV'lerde üretici yazılımı genellikle Android Varsayılan Ana Ekran seçicisini gizler ve Home tuşuna basıldığında stok başlatıcıyı zorlar. Stok başlatıcıyı devre dışı bırakmak (2. Seçenek) veya Ana Ekran Tuşu Düzeltmesini açmak (3. Seçenek) Home tuşunun her zaman tvOS Launcher'ı açmasını sağlar."));
+        infoNote(tr("On TCL and Philips Android 11/12 TVs, the OEM firmware often hides the Android Default Home UI and forces the stock launcher when pressing Home. Disabling the stock launcher (Option 2) or enabling the Home Button Fix (Option 3) guarantees pressing Home always opens GlassTV.",
+                "TCL ve Philips Android 11/12 TV'lerde üretici yazılımı genellikle Android Varsayılan Ana Ekran seçicisini gizler ve Home tuşuna basıldığında stok başlatıcıyı zorlar. Stok başlatıcıyı devre dışı bırakmak (2. Seçenek) veya Ana Ekran Tuşu Düzeltmesini açmak (3. Seçenek) Home tuşunun her zaman GlassTV'yi açmasını sağlar."));
     }
 
     private void subMenuCheckPermissions() {
@@ -2997,7 +2997,7 @@ public class SettingsActivity extends Activity {
         }
 
         section(tr("ONE-TAP ACTIONS", "TEK DOKUNUŞ İŞLEMLERİ"));
-        twoLineRow(tr("Disable All Stock Launchers & Set tvOS Launcher as Home", "Tüm Stok Başlatıcıları Devre Dışı Bırak ve tvOS'u Ana Ekran Yap"),
+        twoLineRow(tr("Disable All Stock Launchers & Set GlassTV as Home", "Tüm Stok Başlatıcıları Devre Dışı Bırak ve GlassTV'yi Ana Ekran Yap"),
                 () -> tr("Disable all ›", "Tümünü kapat ›"),
                 () -> {
                     List<String> toDisable = new ArrayList<>();
@@ -3039,8 +3039,8 @@ public class SettingsActivity extends Activity {
                     }));
         }
 
-        infoNote(tr("Checked items are currently DISABLED. Disabling the stock system launcher (e.g. Google TV Home / LauncherX + setupwraith, Android TV Home, or TCL/Philips OEM Home) forces Android to use tvOS Launcher when pressing the Home key.",
-                "İşaretli öğeler şu anda DEVRE DIŞI bırakılmıştır. Stok sistem başlatıcısını devre dışı bırakmak, Home tuşuna basıldığında Android'in her zaman tvOS Launcher'ı kullanmasını sağlar."));
+        infoNote(tr("Checked items are currently DISABLED. Disabling the stock system launcher (e.g. Google TV Home / LauncherX + setupwraith, Android TV Home, or TCL/Philips OEM Home) forces Android to use GlassTV when pressing the Home key.",
+                "İşaretli öğeler şu anda DEVRE DIŞI bırakılmıştır. Stok sistem başlatıcısını devre dışı bırakmak, Home tuşuna basıldığında Android'in her zaman GlassTV'yi kullanmasını sağlar."));
     }
 
     private void subMenuCytManualDebloat() {

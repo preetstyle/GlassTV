@@ -69,7 +69,7 @@ public final class AppUpdater {
     }
 
     public static String getCurrentVersion(Context c) {
-        if (c == null) return "2.0.5";
+        if (c == null) return "1.0.0";
         try {
             PackageInfo pi = c.getPackageManager().getPackageInfo(c.getPackageName(), 0);
             if (pi != null && pi.versionName != null && !pi.versionName.isEmpty()) {
@@ -77,7 +77,7 @@ public final class AppUpdater {
             }
         } catch (Throwable ignored) {
         }
-        return "2.0.5";
+        return "1.0.0";
     }
 
     public static String getCachedLatestVersion(Context c) {
@@ -211,8 +211,16 @@ public final class AppUpdater {
      * in the background and automatically pulls & installs if a newer release is found.
      */
     public static void checkAutoUpdateIfNeeded(Activity activity) {
-        // Disabled to prevent automatic popups that would overwrite custom customizations
-        return;
+        if (activity == null || activity.isFinishing()) return;
+        if (!isAutoUpdateEnabled(activity)) return;
+        if (checking || downloading) return;
+        long last = prefs(activity).getLong(KEY_LAST_CHECK, 0L);
+        if (System.currentTimeMillis() - last < 6 * 3600_000L) return;
+        checkForUpdates(activity, (success, latestVersion, downloadUrl, updateAvailable, errorMsg) -> {
+            if (success && updateAvailable && !activity.isFinishing()) {
+                downloadAndInstall(activity, downloadUrl, latestVersion, true, null);
+            }
+        });
     }
 
     /**
